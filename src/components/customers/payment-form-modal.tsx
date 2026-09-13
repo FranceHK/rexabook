@@ -59,7 +59,7 @@ export function PaymentFormModal({
     >
       <div className="mb-4 rounded-xl bg-surface-2 p-4 text-sm">
         <div className="flex justify-between">
-          <span className="text-ink-3">Inabakia kwenye deni hili</span>
+          <span className="text-ink-3">Imebaki kwenye deni hili</span>
           <span className="font-semibold text-ink">{fmtPesa(debt.bakaa)}</span>
         </div>
         <div className="mt-1 flex justify-between text-xs text-ink-3">

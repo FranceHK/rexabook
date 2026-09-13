@@ -185,7 +185,7 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
                         <p className="text-sm font-semibold text-success">{fmtPesa(d.kiasiKilicholipwa)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-ink-3">Inabakia</p>
+                        <p className="text-xs text-ink-3">Imebaki</p>
                         <p className={cn("text-sm font-semibold", d.bakaa === 0 ? "text-success" : "text-warning")}>
                           {fmtPesa(d.bakaa)}
                         </p>

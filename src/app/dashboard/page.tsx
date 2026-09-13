@@ -86,7 +86,7 @@ export default async function DashboardPage() {
     { label: "Wateja wote", value: watejaCount.toLocaleString("en-TZ"), sub: "Jumla ya wadaiwa", icon: Users, tone: "blue" },
     { label: "Jumla ya Madeni", value: fmtPesa(jumlaMadeni), sub: "Kiasi chote kimekopeshwa", icon: Wallet, tone: "purple" },
     { label: "Imelipwa", value: fmtPesa(jumlaLipwa), sub: `${paidPct}% imekamilika`, icon: CheckCircle2, tone: "green" },
-    { label: "Inabakia", value: fmtPesa(jumlaBakaa), sub: `${madaiwaYanayoendelea} deni linaloendelea`, icon: Hourglass, tone: "orange" },
+    { label: "Imebaki", value: fmtPesa(jumlaBakaa), sub: `${madaiwaYanayoendelea} deni linaloendelea`, icon: Hourglass, tone: "orange" },
   ];
 
   const quickActions = [
@@ -197,7 +197,7 @@ export default async function DashboardPage() {
                     <p className="mt-1 text-lg font-bold text-success">{fmtPesa(jumlaLipwa)}</p>
                   </div>
                   <div className="rounded-2xl border border-line bg-surface-2 p-3">
-                    <div className="flex items-center gap-1.5 text-xs text-ink-3"><Hourglass className="size-3.5 text-warning" /> Inabakia</div>
+                    <div className="flex items-center gap-1.5 text-xs text-ink-3"><Hourglass className="size-3.5 text-warning" /> Imebaki</div>
                     <p className="mt-1 text-lg font-bold text-warning">{fmtPesa(jumlaBakaa)}</p>
                   </div>
                 </div>
@@ -209,7 +209,7 @@ export default async function DashboardPage() {
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-ink-3">
                     <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-success" /> Imelipwa · {paidPct}%</span>
-                    <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-warning" /> Inabakia · {100 - paidPct}%</span>
+                    <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-warning" /> Imebaki · {100 - paidPct}%</span>
                   </div>
                 </div>
               </div>

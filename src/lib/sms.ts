@@ -58,7 +58,7 @@ export function buildMalipoSMS(d: MalipoSMSData): string {
     ``,
     `Malipo ya ${lipa} yamepokewa.`,
     `Bidhaa: ${d.bidhaa}`,
-    `Kilichobaki (bidhaa hii): ${bakaa}`,
+    `Imebaki (bidhaa hii): ${bakaa}`,
     `Deni lote unalodaiwa: ${jumla}`,
     ``,
     `Asante kwa malipo yako. Tafadhali endelea kulipa ili kumalizia deni lako. Tunakushukuru! - ${d.jinaDuka}`,

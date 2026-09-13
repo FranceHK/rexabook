@@ -63,7 +63,7 @@ export function CustomersView({
 
   const sortLabels: Record<SortKey, string> = {
     jina: "Jina (A-Z)",
-    bakaa: "Inabakia Zaidi",
+    bakaa: "Imebaki Zaidi",
     jumla: "Deni Zaidi",
     mpya: "Wapya Kwanza",
   };
@@ -71,7 +71,7 @@ export function CustomersView({
   const stats = [
     { label: "Wadaiwa wote", value: customers.length.toLocaleString("en-TZ") },
     { label: "Madeni yanayoendelea", value: customers.reduce((s, c) => s + c.deniInayoendelea, 0).toLocaleString("en-TZ") },
-    { label: "Jumla inayobaki", value: fmtPesa(totalBakaa) },
+    { label: "Jumla imebaki", value: fmtPesa(totalBakaa) },
   ];
 
   return (
@@ -198,7 +198,7 @@ export function CustomersView({
 
                 <div className="rounded-xl bg-surface-2 p-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-ink-3">Inabakia</span>
+                    <span className="text-ink-3">Imebaki</span>
                     <span className={cn("font-semibold", c.bakaa === 0 ? "text-success" : "text-ink")}>
                       {fmtPesa(c.bakaa)}
                     </span>
