@@ -1,0 +1,44 @@
+{
+  "name": "rexabook",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RexaBook – modern business management system (debts, payments, customers, cargo tracking)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio",
+    "db:migrate-mysql": "node --experimental-strip-types scripts/migrate-mysql.mts",
+    "db:import-dump": "node --experimental-strip-types scripts/import-dump.mts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.7.0",
+    "bcryptjs": "^3.0.2",
+    "jose": "^6.0.10",
+    "lucide-react": "^0.517.0",
+    "next": "^15.3.3",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.56"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.10",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.15.31",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.5",
+    "mysql2": "^3.24.4",
+    "prisma": "^6.7.0",
+    "tailwindcss": "^4.1.10",
+    "typescript": "^5.8.3"
+  }
+}
