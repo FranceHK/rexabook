@@ -87,7 +87,7 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
     { label: "Madeni yote", value: counts.total.toLocaleString("en-TZ"), icon: ReceiptText },
     { label: "Yanayoendelea", value: counts.active.toLocaleString("en-TZ"), icon: Hourglass },
     { label: "Jumla aliyokopa", value: fmtPesa(totals.kikopa), icon: Wallet },
-    { label: "Amelipa", value: fmtPesa(totals.lipwa), icon: CheckCircle2 },
+    { label: "Deni lililobaki", value: fmtPesa(totals.bakaa), icon: CheckCircle2, accent: "--warning" },
   ];
 
   return (
@@ -128,14 +128,17 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
 
       {/* Stats */}
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="panel flex items-center gap-4 p-4">
-            <div className="grid size-11 shrink-0 place-items-center rounded-2xl neu-inset" style={{ color: "var(--primary)" }}>
-              <Icon className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-ink-3">{label}</p>
-              <p className="truncate text-lg font-semibold text-ink">{value}</p>
+        {stats.map(({ label, value, icon: Icon, accent }) => (
+          <div key={label} className="panel relative overflow-hidden p-4">
+            <div className="absolute inset-x-0 top-0 h-1" style={{ background: `var(${accent ?? "--primary"})` }} />
+            <div className="flex items-center gap-4">
+              <div className="grid size-11 shrink-0 place-items-center rounded-2xl neu-inset" style={{ color: `var(${accent ?? "--primary"})` }}>
+                <Icon className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-ink-3">{label}</p>
+                <p className="mt-0.5 truncate text-lg font-semibold" style={{ color: `var(${accent ?? "--primary"})` }}>{value}</p>
+              </div>
             </div>
           </div>
         ))}
