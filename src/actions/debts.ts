@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { debtCreateSchema, paymentSchema } from "@/lib/validation";
 import { formDataToObject, parseZod, fail, type ActionResult } from "@/lib/action-result";
 import { toMoney, parseDateInput, bakaa as bakaaOf } from "@/lib/format";
-import { buildMalipoSMS, tumaSMS } from "@/lib/sms";
+import { buildDeniSMS, buildMalipoSMS, tumaSMS } from "@/lib/sms";
 
 async function ensureOwnedDebt(userId: number, deniId: number) {
   return prisma.debt.findFirst({
@@ -30,10 +30,10 @@ export async function createDebtAction(
   const tareheKukopa = parseDateInput(tarehe);
   if (!tareheKukopa) return fail("Tarehe si sahihi.");
 
-  const owned = await prisma.customer.count({
+  const owned = await prisma.customer.findFirst({
     where: { id: mteja_id, mtumiajiId: user.id },
   });
-  if (owned === 0) return fail("Mteja hakupatikana.");
+  if (!owned) return fail("Mteja hakupatikana.");
 
   try {
     await prisma.debt.create({
@@ -50,6 +50,18 @@ export async function createDebtAction(
     });
   } catch {
     return fail("Imeshindikana kuongeza deni. Jaribu tena.");
+  }
+
+  // SMS notification for the new debt (best-effort)
+  if (owned.simu) {
+    const ujumbe = buildDeniSMS({
+      jinaMteja: owned.jina,
+      bidhaa: jina_bidhaa,
+      kiasi,
+      maelezo: maelezo || undefined,
+      jinaDuka: user.jina_duka ?? "Duka",
+    });
+    await tumaSMS(owned.simu, ujumbe);
   }
 
   revalidatePath("/dashboard");

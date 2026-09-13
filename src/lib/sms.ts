@@ -81,6 +81,29 @@ export async function logSMS(namba: string, ujumbe: string, status: "success" | 
   }
 }
 
+export interface DeniSMSData {
+  jinaMteja: string;
+  bidhaa: string;
+  kiasi: number;
+  maelezo?: string;
+  jinaDuka: string;
+}
+
+/** SMS sent to a customer when a new debt is registered. */
+export function buildDeniSMS(d: DeniSMSData): string {
+  return [
+    `Habari ${d.jinaMteja},`,
+    ``,
+    `Umeongezewa deni: ${d.bidhaa}`,
+    `Kiasi: ${fmtPesa(d.kiasi)}`,
+    d.maelezo ? `Maelezo: ${d.maelezo}` : null,
+    ``,
+    `Tafadhali lipa kwa wakati uliokubaliwa. Asante kwa uaminifu wako! - ${d.jinaDuka}`,
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
+}
+
 /**
  * Sends an SMS using the Beem Africa API. Returns false (without throwing)
  * when SMS is disabled or fails, matching the original `@tumaSMS` behaviour.
