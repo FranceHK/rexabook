@@ -38,7 +38,7 @@ Open http://localhost:3000 — the first visitor can register a shop account.
 | `DATABASE_URL`    | yes      | Neon pooled connection string             |
 | `SESSION_SECRET`  | yes      | Cookie signing key (`openssl rand -base64 32`) |
 | `NEXTAUTH_URL`    | no       | Base URL for cookies/redirects            |
-| `BEEM_*`          | no       | SMS gateway (skip → no outbound SMS)      |
+| `MESEJI_API_KEY` + `MESEJI_SENDER` | no | SMS gateway via Meseji (skip → no outbound SMS) |
 | `MYSQL_*`         | only migration | Legacy MySQL source connection       |
 
 ## Database

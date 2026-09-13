@@ -16,7 +16,7 @@ export default async function SettingsPage() {
           jinaDuka: user.jina_duka,
           simu: user.simu,
         }}
-        smsConfigured={Boolean(process.env.BEEM_API_KEY && process.env.BEEM_API_SECRET)}
+        smsConfigured={Boolean(process.env.MESEJI_API_KEY)}
       />
     </AppShell>
   );

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { fmtPesa } from "@/lib/format";
 
-const BEEM_URL = "https://apisms.beem.africa/public/v1/sender";
+const MESEJI_URL = "https://meseji.co.tz/api/v1/sms/send";
 
 /**
  * SMS sending is best-effort, exactly like the original PHP app:
@@ -65,22 +65,6 @@ export function buildMalipoSMS(d: MalipoSMSData): string {
   ].join("\n");
 }
 
-/** Inserts an SMS log row (used for records). */
-export async function logSMS(namba: string, ujumbe: string, status: "success" | "failed" | "pending", response?: string) {
-  try {
-    await prisma.smsLog.create({
-      data: {
-        namba,
-        ujumbe,
-        status,
-        response: response ? String(response).slice(0, 2000) : null,
-      },
-    });
-  } catch {
-    // logging must never break the payment flow
-  }
-}
-
 export interface DeniSMSData {
   jinaMteja: string;
   bidhaa: string;
@@ -105,35 +89,58 @@ export function buildDeniSMS(d: DeniSMSData): string {
 }
 
 /**
- * Sends an SMS using the Beem Africa API. Returns false (without throwing)
+ * Normalizes a Tanzanian phone number to MSISDN format (255 + 9 digits),
+ * e.g. "0758285358" → "255758285358", "+255 766 456 786" → "255766456786".
+ */
+export function normalizePhone(namba: string): string {
+  let n = namba.replace(/[\s\-().]/g, "");
+  if (n.startsWith("+")) n = n.slice(1);
+  if (n.startsWith("255")) n = n.slice(3);
+  if (n.startsWith("0")) n = n.slice(1);
+  if (!/^\d{9}$/.test(n)) return namba;
+  return `255${n}`;
+}
+
+/** Inserts an SMS log row (used for records). */
+export async function logSMS(namba: string, ujumbe: string, status: "success" | "failed" | "pending", response?: string) {
+  try {
+    await prisma.smsLog.create({
+      data: {
+        namba,
+        ujumbe,
+        status,
+        response: response ? String(response).slice(0, 2000) : null,
+      },
+    });
+  } catch {
+    // logging must never break the payment flow
+  }
+}
+
+/**
+ * Sends an SMS using the Meseji API. Returns false (without throwing)
  * when SMS is disabled or fails, matching the original `@tumaSMS` behaviour.
  */
 export async function tumaSMS(namba: string, ujumbe: string): Promise<boolean> {
-  const apiKey = process.env.BEEM_API_KEY;
-  const apiSecret = process.env.BEEM_API_SECRET;
+  const apiKey = process.env.MESEJI_API_KEY;
 
-  if (!apiKey || !apiSecret) {
+  if (!apiKey) {
     await logSMS(namba, ujumbe, "pending");
     return false;
   }
 
   const payload = {
-    source_addr: process.env.BEEM_SENDER || "INFO",
-    encoding: 0,
-    schedule_time: "",
+    sender_id: process.env.MESEJI_SENDER || "MESEJI",
     message: ujumbe,
-    recipients: [{ recipient_id: "1", dest_addr: namba }],
+    contacts: normalizePhone(namba),
   };
 
   const headers = new Headers();
   headers.set("Content-Type", "application/json");
-  headers.set(
-    "Authorization",
-    "Basic " + Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")
-  );
+  headers.set("x-api-key", apiKey);
 
   try {
-    const res = await fetch(BEEM_URL, {
+    const res = await fetch(MESEJI_URL, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),

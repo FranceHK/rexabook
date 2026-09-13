@@ -125,13 +125,12 @@ export function SettingsView({ user, smsConfigured }: { user: SettingsUser; smsC
           <CardBody>
             {smsConfigured ? (
               <p className="text-sm text-ink-2">
-                SMS za malipo zimewashwa. Malipo yatamjumlisha mteja kwenye namba yake ya simu kupitia <strong>Beem Africa</strong>.
+                SMS za malipo zimewashwa. Malipo yatamjumlisha mteja kwenye namba yake ya simu kupitia <strong>Meseji</strong>.
               </p>
             ) : (
               <p className="text-sm leading-relaxed text-ink-2">
-                SMS hazijawekwa. Weka <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">BEEM_API_KEY</code>,
-                <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">BEEM_API_SECRET</code> na
-                <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">BEEM_SENDER</code> kwenye faili ya{" "}
+                SMS hazijawekwa. Weka <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">MESEJI_API_KEY</code> na
+                <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">MESEJI_SENDER</code> kwenye faili ya{" "}
                 <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">.env</code> ili SMS tume zipite kwa wateja wako.
                 Mfumo utaendelea kufanya kazi bila SMS.
               </p>
