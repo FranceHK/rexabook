@@ -155,7 +155,7 @@ export default async function DashboardPage() {
       </section>
 
       {/* ============ Stats ============ */}
-      <section className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map(({ label, value, sub, icon: Icon, tone }, i) => (
           <div
             key={label}
@@ -167,8 +167,8 @@ export default async function DashboardPage() {
             <div className="relative flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs text-ink-3">{label}</p>
-                <p className="mt-1.5 truncate text-xl font-bold text-ink">{value}</p>
-                <p className="mt-1 text-xs text-ink-2">{sub}</p>
+                <p className="mt-1.5 text-lg font-bold text-ink sm:text-xl">{value}</p>
+                <p className="mt-1 whitespace-nowrap text-xs text-ink-2">{sub}</p>
               </div>
               <span
                 className="grid size-11 shrink-0 place-items-center rounded-2xl transition"
@@ -251,8 +251,39 @@ export default async function DashboardPage() {
             {madeniKaribuni.length === 0 ? (
               <EmptyState text="Hakuna madeni yaliyoandikwa bado." href="/customers?new=1" cta="Ongeza Mdaiwa wa Kwanza" />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+              <>
+                {/* Mobile: stacked cards */}
+                <div className="divide-y divide-line/60 md:hidden">
+                  {madeniKaribuni.map((d) => {
+                    const pct = pctPaid(d.kiasiAsili, d.kiasiKilicholipwa);
+                    return (
+                      <div key={d.id} className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="grid size-10 shrink-0 place-items-center rounded-xl font-bold" style={{ background: `color-mix(in srgb, var(--primary) 13%, transparent)`, color: "var(--primary)" }}>
+                            {initial(d.customer?.jina ?? "?")}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <Link href={`/customers/${d.mtejaId}`} className="block truncate font-medium text-ink hover:text-primary">
+                              {d.customer?.jina ?? "—"}
+                            </Link>
+                            <p className="truncate text-xs text-ink-3">{d.jinaBidhaa ?? ""}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="whitespace-nowrap text-sm font-semibold text-ink">{fmtPesa(d.kiasiAsili)}</p>
+                            {d.imekamilika ? <Badge tone="done">Imelipwa</Badge> : <Badge tone="wait">Inadaiwa</Badge>}
+                          </div>
+                        </div>
+                        <div className="mt-3">
+                          <ProgressBar pct={pct} />
+                          <span className="mt-1 block text-[11px] text-ink-3">{pct}% imelipwa</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Tablet/desktop: table */}
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-3">
                       <th className="px-5 py-3 font-medium">Mteja</th>
@@ -292,8 +323,9 @@ export default async function DashboardPage() {
                       );
                     })}
                   </tbody>
-                </table>
-              </div>
+                  </table>
+                </div>
+              </>
             )}
           </CardBody>
         </Card>
