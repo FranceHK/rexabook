@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   BookOpenText,
+  Store,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/components/theme/theme-provider";
@@ -24,10 +25,10 @@ interface AppUser {
 }
 
 const nav = [
-  { href: "/dashboard", label: "Dashibodi", icon: LayoutDashboard },
-  { href: "/customers", label: "Wadaiwa", icon: Users },
-  { href: "/cargo", label: "Mizigo", icon: Package },
-  { href: "/settings", label: "Mipangilio", icon: Settings },
+  { href: "/dashboard", label: "Dashibodi", icon: LayoutDashboard, accent: "text-primary" },
+  { href: "/customers", label: "Wadaiwa", icon: Users, accent: "text-info" },
+  { href: "/cargo", label: "Mizigo", icon: Package, accent: "text-success" },
+  { href: "/settings", label: "Mipangilio", icon: Settings, accent: "text-warning" },
 ];
 
 // Bottom nav on phones/tablets: keep it to the 3 main screens.
@@ -42,36 +43,36 @@ function initialsOf(jina: string): string {
     .toUpperCase();
 }
 
-function NavLinks({
-  pathname,
-  onNavigate,
-}: {
-  pathname: string;
-  onNavigate?: () => void;
-}) {
+function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1.5">
-      {nav.map(({ href, label, icon: Icon }) => {
+      {nav.map(({ href, label, icon: Icon, accent }) => {
         const active = pathname === href || pathname.startsWith(href + "/");
         return (
           <Link
             key={href}
             href={href}
+            prefetch
             onClick={onNavigate}
             className={cn(
-              "group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition",
-              active ? "nav-active text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink"
+              "group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200",
+              active
+                ? "bg-gradient-to-r from-primary/15 to-primary-2/8 text-ink shadow-sm"
+                : "text-ink-2 hover:translate-x-1 hover:bg-surface-2 hover:text-ink"
             )}
           >
             <span
               className={cn(
-                "grid size-9 place-items-center rounded-lg transition",
-                active ? "bg-primary/15 text-primary" : "bg-surface-2 text-ink-3 group-hover:text-primary"
+                "grid size-9 shrink-0 place-items-center rounded-xl transition-all duration-200",
+                active ? `bg-primary/15 ${accent}` : "bg-surface-2 text-ink-3 group-hover:scale-105 group-hover:text-primary"
               )}
             >
               <Icon className="size-[18px]" />
             </span>
             {label}
+            {active && (
+              <span className="absolute right-2 size-1.5 rounded-full bg-primary opacity-70" aria-hidden />
+            )}
           </Link>
         );
       })}
@@ -90,7 +91,7 @@ function LogoutBtn({
 }) {
   return (
     <>
-      <div className="mb-3 flex items-center justify-center">
+      <div className="mb-3 flex items-center justify-center gap-1">
         <button
           type="button"
           onClick={onToggleTheme}
@@ -133,12 +134,14 @@ function SidebarBody({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 px-5 pb-6 pt-7">
-        <div className="grid size-11 place-items-center rounded-xl glass-nav text-primary">
+        <div className="grid size-11 place-items-center rounded-2xl text-white shadow-glass bg-gradient-to-br from-primary to-info">
           <BookOpenText className="size-5" />
         </div>
         <div className="min-w-0">
           <p className="truncate text-lg font-medium leading-tight text-ink">RexaBook</p>
-          <p className="truncate text-xs text-ink-3">{user.jinaDuka}</p>
+          <p className="flex items-center gap-1 truncate text-xs text-ink-3">
+            <Store className="size-3" /> {user.jinaDuka}
+          </p>
         </div>
       </div>
 
@@ -151,7 +154,7 @@ function SidebarBody({
 
       <div className="border-t border-line px-3 py-4">
         <div className="mb-3 flex items-center gap-3 px-2.5">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full neu-inset text-sm font-bold text-primary">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full rounded-l-xl neu-inset text-sm font-bold text-primary">
             {initialsOf(user.jina)}
           </span>
           <div className="min-w-0 flex-1">
@@ -198,7 +201,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
-          <div className="anim-fade absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="anim-fade absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
           <aside className="anim-slide-in absolute inset-y-0 left-0 w-72 bg-surface shadow-2xl">
             <button
               type="button"
@@ -226,13 +229,13 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="grid size-9 place-items-center rounded-lg text-ink-2 transition hover:bg-surface-2"
+            className="grid size-9 place-items-center rounded-lg text-ink-2 transition active:scale-95 hover:bg-surface-2"
             aria-label="Fungua menyu"
           >
             <Menu className="size-5" />
           </button>
           <span className="text-sm font-medium text-ink">{currentLabel}</span>
-          <span className="grid size-9 place-items-center rounded-full neu-inset text-sm font-bold text-primary">
+          <span className="grid size-9 place-items-center rounded-full rounded-l-xl neu-inset text-sm font-bold text-primary">
             {initialsOf(user.jina)}
           </span>
         </header>
@@ -254,9 +257,10 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
               <Link
                 key={href}
                 href={href}
+                prefetch
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "anim-fade relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition active:scale-95",
+                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition active:scale-95",
                   active ? "text-primary" : "text-ink-3 hover:text-ink-2"
                 )}
               >

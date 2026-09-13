@@ -2,12 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Package, CircleCheck, CircleDashed, Trash2, Search, Factory } from "lucide-react";
+import {
+  Plus,
+  Package,
+  CircleCheck,
+  CircleDashed,
+  Trash2,
+  Search,
+  Factory,
+  ReceiptText,
+  MapPin,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fmtPesa, fmtTarehe } from "@/lib/format";
 import { useToast } from "@/components/theme/toast-provider";
 import { CargoFormModal } from "@/components/cargo/cargo-form-modal";
 import { CargoArriveModal } from "@/components/cargo/cargo-arrive-modal";
+import { CargoRisitiModal } from "@/components/cargo/cargo-risiti-modal";
 import { RisitiLightbox } from "@/components/cargo/risiti-lightbox";
 import { deleteCargoAction } from "@/actions/cargo";
 
@@ -36,7 +47,7 @@ export interface CargoClient {
 }
 
 const USAFIRI_ICONS: Record<string, string> = {
-  gari: "🚗",
+  gari: "🚚",
   ndege: "✈️",
   bahari: "🚢",
   treni: "🚂",
@@ -51,6 +62,7 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
   const [filter, setFilter] = useState<Filter>("yote");
   const [addOpen, setAddOpen] = useState(clientNewOpen);
   const [arriveTarget, setArriveTarget] = useState<CargoClient | null>(null);
+  const [risitiTarget, setRisitiTarget] = useState<CargoClient | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   const yote = cargos.length;
@@ -71,9 +83,9 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
   }
 
   const stats = [
-    { label: "Mizigo Yote", value: yote.toLocaleString("en-TZ"), icon: Package, tone: "text-primary" },
-    { label: "Inayoendelea", value: haijafika.toLocaleString("en-TZ"), icon: CircleDashed, tone: "text-warning" },
-    { label: "Imefika", value: imefika.toLocaleString("en-TZ"), icon: CircleCheck, tone: "text-success" },
+    { label: "Mizigo Yote", value: yote.toLocaleString("en-TZ"), icon: Package, tone: "text-primary", grad: "from-primary" },
+    { label: "Inayoendelea", value: haijafika.toLocaleString("en-TZ"), icon: CircleDashed, tone: "text-warning", grad: "from-warning" },
+    { label: "Imefika", value: imefika.toLocaleString("en-TZ"), icon: CircleCheck, tone: "text-success", grad: "from-success" },
   ];
 
   const tabs: { key: Filter; label: string }[] = [
@@ -97,14 +109,17 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
 
       {/* Stats */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {stats.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="panel flex items-center gap-4 p-4">
-            <span className={`grid size-11 place-items-center rounded-2xl neu-inset ${tone}`}>
-              <Icon className="size-5" />
-            </span>
-            <div>
-              <p className="text-xs text-ink-3">{label}</p>
-              <p className="text-lg font-semibold text-ink">{value}</p>
+        {stats.map(({ label, value, icon: Icon, tone, grad }) => (
+          <div key={label} className="panel relative overflow-hidden p-4">
+            <div className={cn("absolute inset-x-0 top-0 h-1 bg-gradient-to-r via-transparent to-transparent opacity-70", grad)} />
+            <div className="flex items-center gap-4">
+              <span className={`grid size-11 shrink-0 place-items-center rounded-2xl neu-inset ${tone}`}>
+                <Icon className="size-5" />
+              </span>
+              <div>
+                <p className="text-xs text-ink-3">{label}</p>
+                <p className="text-lg font-semibold text-ink">{value}</p>
+              </div>
             </div>
           </div>
         ))}
@@ -150,84 +165,106 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
             const main = c.bidhaa[0]?.jinaBidhaa ?? "Biz nyingi";
             const icon = USAFIRI_ICONS[c.ainaUsafiri?.toLowerCase() ?? ""] ?? "📦";
             const imefika = c.hali === "Imefika";
+            const imelipwa = Boolean(c.risitiPicha);
             return (
-              <div key={c.id} className={cn("panel relative overflow-hidden", !imefika && "hover:-translate-y-0.5 transition")}>
-                {imefika && (
-                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-success to-emerald-400" aria-hidden />
-                )}
-                {!imefika && (
-                  <button
-                    type="button"
-                    title="Bonyeza kuweka Imefika"
-                    onClick={() => setArriveTarget(c)}
-                    className="absolute right-2 top-2 grid size-6 place-items-center rounded-full bg-surface-2 text-ink-3 transition hover:text-success"
-                    aria-label="Weka Imefika"
-                  >
-                    <CircleDashed className="size-4" />
-                  </button>
-                )}
+              <div
+                key={c.id}
+                className={cn("panel relative overflow-hidden", !imefika && "hover:-translate-y-0.5 transition")}
+              >
+                {/* Top accent stripe */}
+                <div
+                  className={cn(
+                    "absolute inset-x-0 top-0 h-1.5",
+                    imefika
+                      ? "bg-gradient-to-r from-success via-emerald-400 to-teal-300"
+                      : "bg-gradient-to-r from-warning via-amber-400 to-orange-300"
+                  )}
+                  aria-hidden
+                />
 
                 <div className="p-5">
-                  <div className="mb-4 flex items-start justify-between gap-3 pr-6">
+                  {/* Header row */}
+                  <div className="mb-4 flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
                       {imefika ? (
-                        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-success/12 text-success"><CircleCheck className="size-5" /></span>
+                        <span className="anim-pop grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-success/15 to-emerald-300/15 text-success">
+                          <CircleCheck className="size-6" />
+                        </span>
                       ) : (
-                        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-warning/12 text-warning"><CircleDashed className="size-5" /></span>
+                        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-warning/15 to-amber-300/15 text-warning">
+                          <CircleDashed className="size-6" />
+                        </span>
                       )}
                       <div>
                         <p className="truncate text-[15px] font-semibold text-ink">{main}</p>
-                        <p className="flex items-center gap-1 text-xs text-ink-3"><Factory className="size-3" /> {c.jinaKampuni}</p>
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-3">
+                          <Factory className="size-3" /> {c.jinaKampuni}
+                        </p>
+                        {c.nambariTracking ? (
+                          <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-2">
+                            <Search className="size-3 text-ink-3" /> Tracking: <strong className="text-ink">{c.nambariTracking}</strong>
+                          </p>
+                        ) : null}
                       </div>
                     </div>
-                    <span className={cn("badge", imefika ? "badge-done" : "badge-wait")}>
-                      {imefika ? "Imefika" : "Haijafika"}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <span className={cn("badge", imefika ? "badge-done" : "badge-wait")}>
+                        {imefika ? "Imefika" : "Haijafika"}
+                      </span>
+                      {imelipwa ? (
+                        <span className="badge badge-done">💳 Imelipwa</span>
+                      ) : (
+                        <span className="badge badge-wait">Inadaiwa</span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Items table */}
-                  <div className="mb-4 overflow-hidden rounded-xl border border-line">
+                  <div className="mb-4 overflow-hidden rounded-2xl border border-line">
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[340px] text-left text-sm">
-                      <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-ink-3">
-                        <tr>
-                          <th className="px-3 py-2 font-medium">Bidhaa</th>
-                          <th className="px-3 py-2 font-medium">Idadi</th>
-                          <th className="px-3 py-2 font-medium">Bei/pc</th>
-                          <th className="px-3 py-2 text-right font-medium">Jumla</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {c.bidhaa.map((b) => (
-                          <tr key={b.id} className="border-b border-line/60 last:border-0">
-                            <td className="max-w-[120px] truncate px-3 py-2 text-ink-2">{b.jinaBidhaa}</td>
-                            <td className="px-3 py-2 text-ink-2">{b.idadi} {b.kitengo}</td>
-                            <td className="px-3 py-2 text-ink-2">{fmtPesa(b.beiKwaKipande)}</td>
-                            <td className="px-3 py-2 text-right font-medium text-ink">{fmtPesa(b.jumla)}</td>
+                        <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-ink-3">
+                          <tr>
+                            <th className="px-3 py-2 font-medium">Bidhaa</th>
+                            <th className="px-3 py-2 font-medium">Idadi</th>
+                            <th className="px-3 py-2 font-medium">Bei/pc</th>
+                            <th className="px-3 py-2 text-right font-medium">Jumla</th>
                           </tr>
-                        ))}
-                      </tbody>
+                        </thead>
+                        <tbody>
+                          {c.bidhaa.map((b) => (
+                            <tr key={b.id} className="border-b border-line/60 bg-surface last:border-0 hover:bg-surface-2/60">
+                              <td className="max-w-[130px] truncate px-3 py-2 font-medium text-ink-2">{b.jinaBidhaa}</td>
+                              <td className="px-3 py-2 text-ink-2">
+                                {b.idadi} <span className="text-ink-3">{b.kitengo}</span>
+                              </td>
+                              <td className="px-3 py-2 text-ink-2">{fmtPesa(b.beiKwaKipande)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-ink">{fmtPesa(b.jumla)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-gradient-to-r from-primary/8 to-primary-2/8">
+                            <td colSpan={3} className="px-3 py-2.5 text-sm font-medium text-ink-2">Jumla ya Gharama Yote</td>
+                            <td className="px-3 py-2.5 text-right text-base font-bold text-primary">{fmtPesa(c.jumlaGharama)}</td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   </div>
 
-                  <div className="mb-4 flex items-center justify-between rounded-xl bg-surface-2 px-4 py-2.5">
-                    <span className="text-sm text-ink-3">Jumla ya Gharama Yote</span>
-                    <span className="text-lg font-bold text-primary">{fmtPesa(c.jumlaGharama)}</span>
-                  </div>
-
-                  <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-3">
-                    <span>{icon} {c.ainaUsafiri ? c.ainaUsafiri.charAt(0).toUpperCase() + c.ainaUsafiri.slice(1) : "—"}</span>
-                    <span>📅 Kuagiza: {fmtTarehe(c.tareheKuagiza)}</span>
+                  {/* Dates */}
+                  <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-ink-3">
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="size-3.5" /> {icon} {c.ainaUsafiri ? c.ainaUsafiri.charAt(0).toUpperCase() + c.ainaUsafiri.slice(1) : "—"}
+                    </span>
                     {c.tareheKutarajiwa ? <span>🎯 Kutarajiwa: {fmtTarehe(c.tareheKutarajiwa)}</span> : null}
-                    {imefika && c.tareheKufikaHalisi ? <span className="font-medium text-success">✅ Ilifika: {fmtTarehe(c.tareheKufikaHalisi)}</span> : null}
+                    {imefika && c.tareheKufikaHalisi ? (
+                      <span className="inline-flex items-center gap-1 font-semibold text-success">
+                        <CircleCheck className="size-3.5" /> Ilifika: {fmtTarehe(c.tareheKufikaHalisi)}
+                      </span>
+                    ) : null}
                   </div>
-
-                  {c.nambariTracking ? (
-                    <div className="mb-3 flex items-center gap-1.5 text-sm text-ink-2">
-                      <Search className="size-3.5 text-ink-3" /> Tracking: <strong className="text-ink">{c.nambariTracking}</strong>
-                    </div>
-                  ) : null}
 
                   {c.maelezo ? <p className="mb-3 text-sm text-ink-2">💬 {c.maelezo}</p> : null}
 
@@ -235,30 +272,41 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
                     <button
                       type="button"
                       onClick={() => setLightbox(c.risitiPicha!)}
-                      className="mb-3 flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm text-ink-2 transition hover:bg-surface-3"
+                      className="mb-3 flex w-full items-center gap-2 rounded-xl bg-success/8 px-3 py-2 text-sm text-success transition hover:bg-success/15"
                     >
-                      🧾 Risiti ya Malipo
-                      <img src={c.risitiPicha} alt="Risiti" className="ml-auto h-14 w-20 rounded-lg object-cover" />
+                      <ReceiptText className="size-4" /> Risiti ya Malipo
+                      <img src={c.risitiPicha} alt="Risiti" className="ml-auto h-12 w-16 rounded-lg object-cover ring-1 ring-line" />
                     </button>
                   ) : null}
 
-                  <div className="flex items-center gap-3 border-t border-line pt-3">
+                  {/* Actions */}
+                  <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
                     {!imefika ? (
-                      <button type="button" onClick={() => setArriveTarget(c)} className="btn btn-success btn-sm">
-                        <CircleCheck className="size-4" /> Weka Imefika
+                      <button type="button" onClick={() => setArriveTarget(c)} className="btn btn-success">
+                        <CircleCheck className="size-4" /> Umefika
                       </button>
                     ) : (
                       <span className="badge badge-done">✓ Imefika</span>
                     )}
+
+                    {!imelipwa ? (
+                      <button type="button" onClick={() => setRisitiTarget(c)} className="btn btn-secondary">
+                        <ReceiptText className="size-4" /> Weka Risiti
+                      </button>
+                    ) : null}
+
                     <div className="flex-1" />
-                    <button
-                      type="button"
-                      onClick={() => futaMzigo(c)}
-                      className="btn btn-danger btn-sm"
-                      aria-label="Futa mzigo"
-                    >
-                      <Trash2 className="size-4" /> Futa
-                    </button>
+
+                    {!imefika && (
+                      <button
+                        type="button"
+                        onClick={() => futaMzigo(c)}
+                        className="btn btn-danger btn-sm"
+                        aria-label="Futa mzigo"
+                      >
+                        <Trash2 className="size-4" /> Futa
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -269,6 +317,7 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
 
       {addOpen && <CargoFormModal onClose={() => setAddOpen(false)} />}
       {arriveTarget && <CargoArriveModal cargo={arriveTarget} onClose={() => setArriveTarget(null)} />}
+      {risitiTarget && <CargoRisitiModal cargo={risitiTarget} onClose={() => setRisitiTarget(null)} />}
       <RisitiLightbox src={lightbox} onClose={() => setLightbox(null)} />
     </div>
   );

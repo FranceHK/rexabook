@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -31,7 +32,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, maxWid
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className={cn("modal-overlay open", !glass && "dark:[&_.modal-box]:bg-surface-2")}
       onMouseDown={(e) => {
@@ -41,7 +42,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, maxWid
       aria-modal="true"
       aria-label={typeof title === "string" ? title : undefined}
     >
-      <div className={cn("modal-box", glass && "glass-modal", maxWidth)}>
+      <div className={cn("modal-box anim-pop", glass && "glass-modal", maxWidth)}>
         {(title || subtitle) && (
           <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
             <div>
@@ -63,6 +64,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, maxWid
           <div className="flex items-center justify-end gap-3 border-t border-line px-6 py-4">{footer}</div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
