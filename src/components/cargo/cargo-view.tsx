@@ -187,7 +187,8 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
 
                   {/* Items table */}
                   <div className="mb-4 overflow-hidden rounded-xl border border-line">
-                    <table className="w-full text-left text-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[340px] text-left text-sm">
                       <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-ink-3">
                         <tr>
                           <th className="px-3 py-2 font-medium">Bidhaa</th>
@@ -206,7 +207,8 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                      </table>
+                    </div>
                   </div>
 
                   <div className="mb-4 flex items-center justify-between rounded-xl bg-surface-2 px-4 py-2.5">

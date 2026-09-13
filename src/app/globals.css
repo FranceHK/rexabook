@@ -3,6 +3,16 @@
 /* Use class-based dark mode (default: dark, matching the original app) */
 @custom-variant dark (&:where(.dark, .dark *));
 
+@layer base {
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Tailwind theme → CSS variable bridge                               */
 /* ------------------------------------------------------------------ */
@@ -396,6 +406,74 @@ input[type="datetime-local"].field {
 .bar-in {
   animation: bar-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: bottom;
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-18px);
+    opacity: 0.4;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.anim-slide-in {
+  animation: slide-in-left 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-page {
+  animation: page-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.anim-fade {
+  animation: fade-in 0.35s ease both;
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.anim-pop {
+  animation: pop-in 0.18s ease both;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 @keyframes lightbox-in {

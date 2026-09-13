@@ -119,7 +119,7 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {stats.map(({ label, value, icon: Icon }) => (
           <div key={label} className="panel flex items-center gap-4 p-4">
             <div className="grid size-11 shrink-0 place-items-center rounded-2xl neu-inset" style={{ color: "var(--primary)" }}>

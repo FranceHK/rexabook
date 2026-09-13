@@ -137,25 +137,25 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="hidden min-w-[240px] flex-col gap-3 sm:flex">
-            <div className="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur">
-              <p className="text-xs text-white/70">Imekusanya kwa wiki hii</p>
-              <p className="text-xl font-bold">
+          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:min-w-[240px] sm:flex-col">
+            <div className="rounded-2xl bg-white/15 px-3 py-2.5 backdrop-blur sm:px-4 sm:py-3">
+              <p className="text-[11px] text-white/70 sm:text-xs">Imekusanya kwa wiki hii</p>
+              <p className="text-base font-bold sm:text-xl">
                 {chartData.reduce((s, d) => s + d.value, 0) > 0
                   ? "TZS " + chartData.reduce((s, d) => s + d.value, 0).toLocaleString("en-TZ")
                   : "—"}
               </p>
             </div>
-            <div className="flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-3 text-sm backdrop-blur">
-              <TrendingUp className="size-4 text-white" />
-              <span className="text-white/85">{madaiwaYanayoendelea} deni bado linaendelea</span>
+            <div className="flex items-center gap-2 rounded-2xl bg-white/15 px-3 py-2.5 text-sm backdrop-blur sm:px-4 sm:py-3">
+              <TrendingUp className="size-4 shrink-0 text-white" />
+              <span className="text-[11px] text-white/85 sm:text-sm">{madaiwaYanayoendelea} deni bado linaendelea</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* ============ Stats ============ */}
-      <section className="mb-8 grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <section className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
         {stats.map(({ label, value, sub, icon: Icon, tone }, i) => (
           <div
             key={label}

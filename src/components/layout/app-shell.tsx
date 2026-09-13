@@ -195,8 +195,8 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-72 bg-surface shadow-2xl anim-slide-in">
+          <div className="anim-fade absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <aside className="anim-slide-in absolute inset-y-0 left-0 w-72 bg-surface shadow-2xl">
             <button
               type="button"
               onClick={() => setMobileOpen(false)}
@@ -234,8 +234,37 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
           </span>
         </header>
 
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+        <main
+          key={pathname}
+          className="anim-page mx-auto max-w-7xl px-4 pb-24 pt-5 sm:px-6 sm:pt-6 lg:px-8 lg:pb-10 lg:pt-8"
+        >
+          {children}
+        </main>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
+        <div className="mx-auto flex max-w-md items-stretch">
+          {nav.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "anim-fade relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition active:scale-95",
+                  active ? "text-primary" : "text-ink-3 hover:text-ink-2"
+                )}
+              >
+                {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />}
+                <Icon className="size-5" />
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
