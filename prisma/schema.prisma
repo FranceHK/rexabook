@@ -1,0 +1,156 @@
+// =====================================================================
+// RexaBook – Prisma schema (Neon PostgreSQL)
+// ---------------------------------------------------------------------
+// Migrated from the MySQL schema found in `htdocs/sql/database.sql`
+// and `htdocs/sms_log_table.sql`.
+//
+// Model name mapping (old MySQL table name -> Prisma model):
+//   watumiaji      -> User
+//   wateja         -> Customer
+//   madeni         -> Debt
+//   malipo         -> Payment
+//   sms_log        -> SmsLog
+//   mizigo         -> Cargo
+//   mizigo_bidhaa  -> CargoItem
+//
+// Column name mapping is documented in scripts/migrate-mysql.mts and
+// in the README. MySQL types were translated to PostgreSQL:
+//   INT AUTO_INCREMENT -> Int @id @default(autoincrement())
+//   TIMESTAMP          -> DateTime
+//   DECIMAL            -> Decimal
+//   BOOLEAN            -> Boolean
+//   ENUM(...)          -> Prisma enum (PgEnum)
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Hali {
+  Haijafika
+  Imefika
+}
+
+enum SmsStatus {
+  success
+  failed
+  pending
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  jina           String   @unique @db.VarChar(100)
+  nenosiri       String   @db.VarChar(255)
+  jina_duka      String   @db.VarChar(150)
+  simu           String?  @db.VarChar(20)
+  tareheKuundwa  DateTime @default(now())
+
+  customers Customer[]
+  debts    Debt[]
+  cargos   Cargo[]
+
+  @@map("watumiaji")
+}
+
+model Customer {
+  id                   Int      @id @default(autoincrement())
+  mtumiajiId           Int?
+  jina                 String   @db.VarChar(100)
+  simu                 String?  @db.VarChar(20)
+  location             String?  @db.VarChar(150)
+  tareheKuandikishwa   DateTime @default(now())
+
+  user   User?  @relation(fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  debts  Debt[]
+
+  @@index([mtumiajiId])
+  @@map("wateja")
+}
+
+model Debt {
+  id                 Int      @id @default(autoincrement())
+  mtejaId            Int?
+  mtumiajiId         Int?
+  jinaBidhaa         String?  @db.VarChar(150)
+  kiasiAsili         Decimal? @db.Decimal(10, 2)
+  kiasiKilicholipwa  Decimal  @default(0) @db.Decimal(10, 2)
+  tareheKukopa       DateTime @db.Timestamp(6)
+  maelezo            String?  @db.Text
+  imekamilika        Boolean  @default(false)
+
+  customer Customer? @relation(fields: [mtejaId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([mtejaId])
+  @@index([mtumiajiId])
+  @@map("madeni")
+}
+
+model Payment {
+  id      Int      @id @default(autoincrement())
+  deniId  Int?
+  kiasi   Decimal  @db.Decimal(10, 2)
+  tarehe  DateTime @default(now())
+  maelezo String?  @db.Text
+
+  debt Debt? @relation(fields: [deniId], references: [id], onDelete: Cascade)
+
+  @@index([deniId])
+  @@map("malipo")
+}
+
+model SmsLog {
+  id       Int      @id @default(autoincrement())
+  namba    String   @db.VarChar(20)
+  ujumbe   String   @db.Text
+  status   SmsStatus @default(pending)
+  response String?  @db.Text
+  tarehe   DateTime @default(now())
+
+  @@index([namba])
+  @@index([tarehe])
+  @@index([status])
+  @@map("sms_log")
+}
+
+model Cargo {
+  id                 Int      @id @default(autoincrement())
+  mtumiajiId         Int?
+  jinaKampuni        String   @db.VarChar(150)
+  jumlaGharama       Decimal  @default(0) @db.Decimal(12, 2)
+  ainaUsafiri        String?  @db.VarChar(100)
+  nambariTracking    String?  @db.VarChar(100)
+  tareheKuagiza      DateTime @db.Date
+  tareheKutarajiwa   DateTime? @db.Date
+  tareheKufikaHalisi DateTime? @db.Date
+  hali               Hali    @default(Haijafika)
+  maelezo            String?  @db.Text
+  risitiPicha        String?  @db.Text
+
+  user  User?       @relation(fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  items CargoItem[]
+
+  @@index([mtumiajiId])
+  @@map("mizigo")
+}
+
+model CargoItem {
+  id             Int    @id @default(autoincrement())
+  mzigoId        Int
+  jinaBidhaa     String @db.VarChar(150)
+  idadi          Int
+  kitengo        String @default("pc") @db.VarChar(50)
+  beiKwaKipande  Decimal @db.Decimal(10, 2)
+  jumla          Decimal @db.Decimal(12, 2)
+
+  cargo Cargo @relation(fields: [mzigoId], references: [id], onDelete: Cascade)
+
+  @@index([mzigoId])
+  @@map("mizigo_bidhaa")
+}
