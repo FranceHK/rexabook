@@ -1,16 +1,33 @@
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { toMoney, fmtPesa, fmtTarehe, fmtTareheRefu, bakaa as bakaaOf, pctPaid } from "@/lib/format";
+import { toMoney, fmtPesa, fmtTarehe, fmtTareheRefu, bakaa as bakaaOf, pctPaid, initial } from "@/lib/format";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardHeader, CardBody } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProgressBar } from "@/components/ui/progress";
 import { PaymentsChart, type ChartPoint } from "@/components/dashboard/payments-chart";
-import { Users, Wallet, CheckCircle2, Hourglass, Plus, Search, Files, LayoutList } from "lucide-react";
+import {
+  Users,
+  Wallet,
+  CheckCircle2,
+  Hourglass,
+  Plus,
+  Search,
+  Files,
+  LayoutList,
+  TrendingUp,
+  ArrowUpRight,
+  Sparkles,
+  HandCoins,
+  PackagePlus,
+  ReceiptText,
+} from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Dashibodi" };
+
+const DELAY = ["0ms", "60ms", "120ms", "180ms"];
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -26,16 +43,17 @@ export default async function DashboardPage() {
   const jumlaLipwa = madeni.reduce((s, d) => s + toMoney(d.kiasiKilicholipwa), 0);
   const jumlaBakaa = madeni.reduce((s, d) => s + bakaaOf(d.kiasiAsili, d.kiasiKilicholipwa), 0);
   const madaiwaYanayoendelea = madeni.filter((d) => !d.imekamilika).length;
+  const paidPct = jumlaMadeni > 0 ? Math.round((jumlaLipwa / jumlaMadeni) * 100) : 0;
 
   const madeniKaribuni = [...madeni]
     .sort((a, b) => b.tareheKukopa.getTime() - a.tareheKukopa.getTime())
-    .slice(0, 10);
+    .slice(0, 8);
 
   const malipoKaribuni = await prisma.payment.findMany({
     where: { debt: { mtumiajiId: user.id } },
     include: { debt: { select: { customer: { select: { jina: true } }, jinaBidhaa: true } } },
     orderBy: { tarehe: "desc" },
-    take: 6,
+    take: 5,
   });
 
   // Last 7 days of payments for the chart
@@ -47,9 +65,8 @@ export default async function DashboardPage() {
     d.setDate(d.getDate() - i);
     const next = new Date(d);
     next.setDate(d.getDate() + 1);
-    const dayStart = d;
     const sum = await prisma.payment.aggregate({
-      where: { debt: { mtumiajiId: user.id }, tarehe: { gte: dayStart, lt: next } },
+      where: { debt: { mtumiajiId: user.id }, tarehe: { gte: d, lt: next } },
       _sum: { kiasi: true },
     });
     chartData.push({
@@ -63,63 +80,172 @@ export default async function DashboardPage() {
   });
 
   const today = fmtTareheRefu(new Date());
+  const firstName = user.jina.split("@")[0].split(".")[0] || user.jina;
 
   const stats = [
     { label: "Wateja wote", value: watejaCount.toLocaleString("en-TZ"), sub: "Jumla ya wadaiwa", icon: Users, tone: "blue" },
-    { label: "Jumla ya Madeni", value: fmtPesa(jumlaMadeni), sub: "Kiasi chote", icon: Wallet, tone: "red" },
-    { label: "Malipo Yote", value: fmtPesa(jumlaLipwa), sub: "Imelipwa", icon: CheckCircle2, tone: "green" },
-    { label: "Bado Inadaiwa", value: fmtPesa(jumlaBakaa), sub: `${madaiwaYanayoendelea} deni linaloendelea`, icon: Hourglass, tone: "orange" },
+    { label: "Jumla ya Madeni", value: fmtPesa(jumlaMadeni), sub: "Kiasi chote kimekopeshwa", icon: Wallet, tone: "purple" },
+    { label: "Imelipwa", value: fmtPesa(jumlaLipwa), sub: `${paidPct}% imekamilika`, icon: CheckCircle2, tone: "green" },
+    { label: "Inabakia", value: fmtPesa(jumlaBakaa), sub: `${madaiwaYanayoendelea} deni linaloendelea`, icon: Hourglass, tone: "orange" },
   ];
 
   const quickActions = [
-    { label: "Wadaiwa", href: "/customers", icon: Users },
-    { label: "Mdaiwa Mpya", href: "/customers?new=1", icon: Plus },
-    { label: "Mizigo", href: "/cargo", icon: Search },
-    { label: "Ripoti PDF", href: "/customers", icon: Files },
+    { label: "Wadaiwa", href: "/customers", icon: Users, tone: "blue" },
+    { label: "Mdaiwa Mpya", href: "/customers?new=1", icon: ReceiptText, tone: "green" },
+    { label: "Mizigo", href: "/cargo", icon: Search, tone: "purple" },
+    { label: "Mzigo Mpya", href: "/cargo?new=1", icon: PackagePlus, tone: "orange" },
   ];
 
   return (
     <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka }}>
-      {/* Page header */}
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">
-            Karibu, <span className="bg-gradient-to-r from-primary to-info bg-clip-text text-transparent">{user.jina}</span> 👋
-          </h1>
-          <p className="mt-1 text-sm text-ink-3">{today}</p>
-        </div>
-        <div className="flex gap-2">
-          <Link href="/customers?new=1" className="btn btn-primary">
-            <Plus className="size-4" /> Mdaiwa Mpya
-          </Link>
-          <Link href="/cargo?new=1" className="btn btn-secondary">
-            <Plus className="size-4" /> Mzigo Mpya
-          </Link>
-        </div>
-      </div>
+      {/* ============ Hero ============ */}
+      <section
+        className="anim-up relative mb-8 overflow-hidden rounded-3xl p-6 text-white shadow-glass md:p-8"
+        style={{
+          backgroundImage:
+            "linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary-2) 70%, var(--primary)) 55%, var(--info) 100%)",
+        }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(255,255,255,0.4)_1px,transparent_1px);background-size:22px_22px]"
+        />
+        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-white/10 blur-3xl" />
 
-      {/* Stats */}
-      <div className="mb-8 grid grid-cols-2 gap-4 xl:grid-cols-4">
-        {stats.map(({ label, value, sub, icon: Icon, tone }) => (
-          <div key={label} className="panel group relative overflow-hidden p-5 transition hover:-translate-y-0.5">
-            <div className={`absolute inset-x-0 top-0 h-1 ${toneStyles(tone)} rounded-t-2xl`} aria-hidden />
-            <div className="flex items-center gap-4">
-              <div className="grid size-12 shrink-0 place-items-center rounded-2xl neu-inset" style={{ color: `var(${toneVar(tone)})` }}>
-                <Icon className="size-5" />
-              </div>
+        <div className="relative flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-white/70">
+              <Sparkles className="size-3.5" /> Dashibodi · {user.jina_duka}
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold leading-snug md:text-3xl">
+              Karibu tena, {firstName} 👋
+            </h1>
+            <p className="mt-1 text-sm text-white/80">{today}</p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <Link href="/customers?new=1" className="inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[var(--primary)] shadow-lg transition hover:-translate-y-0.5">
+                <Plus className="size-4" /> Mdaiwa Mpya
+              </Link>
+              <Link href="/cargo?new=1" className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/25">
+                <PackagePlus className="size-4" /> Mzigo Mpya
+              </Link>
+              {activeCargo > 0 ? (
+                <Link href="/cargo" className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white/90 backdrop-blur transition hover:bg-white/25">
+                  <Hourglass className="size-3.5" /> {activeCargo} mzigo haujafika
+                </Link>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="hidden min-w-[240px] flex-col gap-3 sm:flex">
+            <div className="rounded-2xl bg-white/15 px-4 py-3 backdrop-blur">
+              <p className="text-xs text-white/70">Imekusanya kwa wiki hii</p>
+              <p className="text-xl font-bold">
+                {chartData.reduce((s, d) => s + d.value, 0) > 0
+                  ? "TZS " + chartData.reduce((s, d) => s + d.value, 0).toLocaleString("en-TZ")
+                  : "—"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-3 text-sm backdrop-blur">
+              <TrendingUp className="size-4 text-white" />
+              <span className="text-white/85">{madaiwaYanayoendelea} deni bado linaendelea</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============ Stats ============ */}
+      <section className="mb-8 grid grid-cols-2 gap-4 xl:grid-cols-4">
+        {stats.map(({ label, value, sub, icon: Icon, tone }, i) => (
+          <div
+            key={label}
+            className="anim-up panel group relative overflow-hidden p-5 transition hover:-translate-y-1 hover:shadow-glass"
+            style={{ animationDelay: DELAY[i % DELAY.length] }}
+          >
+            <div aria-hidden className={`absolute -right-8 -top-8 size-24 rounded-full opacity-0 blur-2xl transition group-hover:opacity-100`} style={{ background: `color-mix(in srgb, var(${toneVar(tone)}) 35%, transparent)` }} />
+            <div aria-hidden className={`absolute inset-x-0 top-0 h-1`} style={{ background: `var(${toneVar(tone)})` }} />
+            <div className="relative flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs text-ink-3">{label}</p>
-                <p className="truncate text-xl font-semibold text-ink">{value}</p>
-                <p className="text-xs text-ink-2">{sub}</p>
+                <p className="mt-1.5 truncate text-xl font-bold text-ink">{value}</p>
+                <p className="mt-1 text-xs text-ink-2">{sub}</p>
               </div>
+              <span
+                className="grid size-11 shrink-0 place-items-center rounded-2xl transition"
+                style={{ background: `color-mix(in srgb, var(${toneVar(tone)}) 14%, transparent)`, color: `var(${toneVar(tone)})` }}
+              >
+                <Icon className="size-5" />
+              </span>
             </div>
           </div>
         ))}
-      </div>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent debts */}
-        <Card className="lg:col-span-2">
+      {/* ============ Health + chart ============ */}
+      <section className="mb-8 grid gap-6 lg:grid-cols-3">
+        <Card className="anim-up lg:col-span-2">
+          <CardHeader title={<span className="flex items-center gap-2"><TrendingUp className="size-4 text-primary" /> Hali ya Biashara</span>} action={<Badge tone={paidPct >= 100 ? "done" : "wait"}>{paidPct}% imelipwa</Badge>} />
+          <CardBody>
+            <div className="grid gap-6 sm:grid-cols-[1.1fr_1fr]">
+              <div>
+                <p className="text-xs text-ink-3">Jumla ya madeni yote</p>
+                <p className="mt-1 text-2xl font-bold tracking-tight text-ink md:text-3xl">{fmtPesa(jumlaMadeni)}</p>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-line bg-surface-2 p-3">
+                    <div className="flex items-center gap-1.5 text-xs text-ink-3"><CheckCircle2 className="size-3.5 text-success" /> Imelipwa</div>
+                    <p className="mt-1 text-lg font-bold text-success">{fmtPesa(jumlaLipwa)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-line bg-surface-2 p-3">
+                    <div className="flex items-center gap-1.5 text-xs text-ink-3"><Hourglass className="size-3.5 text-warning" /> Inabakia</div>
+                    <p className="mt-1 text-lg font-bold text-warning">{fmtPesa(jumlaBakaa)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  <div className="flex h-3 overflow-hidden rounded-full bg-surface-3">
+                    <div className="h-full rounded-l-full transition-[width] duration-700" style={{ width: `${paidPct}%`, background: "linear-gradient(90deg, var(--success), color-mix(in srgb, var(--success) 60%, var(--primary)))" }} />
+                    {paidPct < 100 ? <div className="h-full flex-1 rounded-r-full" style={{ background: "linear-gradient(90deg, var(--warning), color-mix(in srgb, var(--warning) 60%, var(--danger)))" }} /> : null}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-ink-3">
+                    <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-success" /> Imelipwa · {paidPct}%</span>
+                    <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-warning" /> Inabakia · {100 - paidPct}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-line bg-surface-2 p-4">
+                <PaymentsChart data={chartData} />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Quick actions */}
+        <Card className="anim-up" >
+          <CardHeader title={<span className="flex items-center gap-2"><HandCoins className="size-4 text-primary" /> Vitendo vya Haraka</span>} />
+          <CardBody className="grid grid-cols-2 gap-3">
+            {quickActions.map(({ label, href, icon: Icon, tone }, i) => (
+              <Link
+                key={label}
+                href={href}
+                className="group flex flex-col items-center gap-2.5 rounded-2xl border border-line bg-surface-2 p-4 text-sm font-medium text-ink-2 transition hover:-translate-y-0.5 hover:border-transparent hover:shadow-glass"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <span className="grid size-11 place-items-center rounded-2xl transition group-hover:scale-105" style={{ background: `color-mix(in srgb, var(${toneVar(tone)}) 13%, transparent)`, color: `var(${toneVar(tone)})` }}>
+                  <Icon className="size-5" />
+                </span>
+                {label}
+                <ArrowUpRight className="size-3.5 text-ink-3 opacity-0 transition group-hover:opacity-100" />
+              </Link>
+            ))}
+          </CardBody>
+        </Card>
+      </section>
+
+      {/* ============ Recent debts + payments ============ */}
+      <section className="grid gap-6 lg:grid-cols-3">
+        <Card className="anim-up lg:col-span-2">
           <CardHeader title={<span className="flex items-center gap-2"><LayoutList className="size-4 text-primary" /> Madeni ya Hivi Karibuni</span>} action={<Link href="/customers" className="text-sm font-medium text-primary hover:underline">Ona Yote →</Link>} />
           <CardBody className="p-0">
             {madeniKaribuni.length === 0 ? (
@@ -137,25 +263,34 @@ export default async function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {madeniKaribuni.map((d) => (
-                      <tr key={d.id} className="border-b border-line/60 transition hover:bg-surface-2">
-                        <td className="px-5 py-3.5">
-                          <Link href={`/customers/${d.mtejaId}`} className="font-medium text-primary hover:underline">
-                            {d.customer?.jina ?? "—"}
-                          </Link>
-                        </td>
-                        <td className="max-w-[140px] truncate px-5 py-3.5 text-ink-2">{d.jinaBidhaa}</td>
-                        <td className="whitespace-nowrap px-5 py-3.5 font-medium text-ink">{fmtPesa(d.kiasiAsili)}</td>
-                        <td className="px-5 py-3.5">
-                          <div className="w-32">
-                            <ProgressBar pct={pctPaid(d.kiasiAsili, d.kiasiKilicholipwa)} />
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {d.imekamilika ? <Badge tone="done">Imelipwa</Badge> : <Badge tone="wait">Inadaiwa</Badge>}
-                        </td>
-                      </tr>
-                    ))}
+                    {madeniKaribuni.map((d) => {
+                      const pct = pctPaid(d.kiasiAsili, d.kiasiKilicholipwa);
+                      return (
+                        <tr key={d.id} className="border-b border-line/60 transition-colors hover:bg-surface-2">
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <span className="grid size-9 shrink-0 place-items-center rounded-xl font-bold" style={{ background: `color-mix(in srgb, var(--primary) 13%, transparent)`, color: "var(--primary)" }}>
+                                {initial(d.customer?.jina ?? "?")}
+                              </span>
+                              <Link href={`/customers/${d.mtejaId}`} className="font-medium text-ink hover:text-primary">
+                                {d.customer?.jina ?? "—"}
+                              </Link>
+                            </div>
+                          </td>
+                          <td className="max-w-[150px] truncate px-5 py-3.5 text-ink-2">{d.jinaBidhaa ?? "—"}</td>
+                          <td className="whitespace-nowrap px-5 py-3.5 font-semibold text-ink">{fmtPesa(d.kiasiAsili)}</td>
+                          <td className="px-5 py-3.5">
+                            <div className="w-32">
+                              <ProgressBar pct={pct} />
+                              <span className="mt-1 block text-[11px] text-ink-3">{pct}%</span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            {d.imekamilika ? <Badge tone="done">Imelipwa</Badge> : <Badge tone="wait">Inadaiwa</Badge>}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -163,39 +298,24 @@ export default async function DashboardPage() {
           </CardBody>
         </Card>
 
-        {/* Right column */}
         <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader title={<span className="flex items-center gap-2"><Plus className="size-4 text-primary" /> Vitendo vya Haraka</span>} />
-            <CardBody className="grid grid-cols-2 gap-3">
-              {quickActions.map(({ label, href, icon: Icon }) => (
-                <Link key={label} href={href} className="flex flex-col items-center gap-2 rounded-2xl neu p-4 text-sm font-medium text-ink-2 transition hover:text-primary">
-                  <span className="grid size-10 place-items-center rounded-xl text-primary" style={{ background: "color-mix(in srgb, var(--primary) 12%, transparent)" }}>
-                    <Icon className="size-5" />
-                  </span>
-                  {label}
-                </Link>
-              ))}
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader title={<span className="flex items-center gap-2"><Wallet className="size-4 text-primary" /> Malipo ya Hivi Karibuni</span>} />
+          <Card className="anim-up">
+            <CardHeader title={<span className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Malipo ya Hivi Karibuni</span>} />
             <CardBody className="p-0">
               {malipoKaribuni.length === 0 ? (
-                <p className="px-5 py-8 text-center text-sm text-ink-3">Hakuna malipo bado</p>
+                <p className="px-5 py-10 text-center text-sm text-ink-3">Hakuna malipo bado</p>
               ) : (
                 <div className="divide-y divide-line/60">
                   {malipoKaribuni.map((m) => (
-                    <div key={m.id} className="flex items-center gap-3 px-5 py-3.5">
-                      <span className="grid size-10 shrink-0 place-items-center rounded-full neu-inset text-sm font-bold text-primary">
-                        {(m.debt?.customer?.jina ?? "?").charAt(0).toUpperCase()}
+                    <div key={m.id} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface-2">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ background: "linear-gradient(135deg, var(--primary), var(--info))" }}>
+                        {initial(m.debt?.customer?.jina ?? "?")}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-ink">{m.debt?.customer?.jina}</p>
-                        <p className="truncate text-xs text-ink-3">{m.debt?.jinaBidhaa} · {fmtTarehe(m.tarehe)}</p>
+                        <p className="truncate text-sm font-medium text-ink">{m.debt?.customer?.jina ?? "—"}</p>
+                        <p className="truncate text-xs text-ink-3">{m.debt?.jinaBidhaa ?? ""} · {fmtTarehe(m.tarehe)}</p>
                       </div>
-                      <span className="whitespace-nowrap text-sm font-semibold text-success">+{fmtPesa(m.kiasi)}</span>
+                      <span className="whitespace-nowrap text-sm font-bold text-success">+{fmtPesa(m.kiasi)}</span>
                     </div>
                   ))}
                 </div>
@@ -203,35 +323,27 @@ export default async function DashboardPage() {
             </CardBody>
           </Card>
 
-          <Card>
-            <CardHeader title={<span className="flex items-center gap-2"><CheckCircle2 className="size-4 text-primary" /> Malipo kwa Kila Siku</span>} />
-            <CardBody>
-              <PaymentsChart data={chartData} />
-              <p className="mt-3 text-center text-xs text-ink-3">
-                Siku 7 zilizopita · {activeCargo} mzigo haujafika
-              </p>
+          <Card className="anim-up">
+            <CardBody className="flex items-center gap-3 py-4">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl" style={{ background: `color-mix(in srgb, var(--info) 14%, transparent)`, color: "var(--info)" }}>
+                <Files className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-ink">Ripoti za PDF</p>
+                <p className="text-xs text-ink-3">Rekodi ya madeni na malipo</p>
+              </div>
+              <Link href="/customers" className="btn btn-soft btn-sm">Zioni</Link>
             </CardBody>
           </Card>
         </div>
-      </div>
+      </section>
     </AppShell>
   );
 }
 
-function toneStyles(tone: string): string {
-  return (
-    {
-      blue: "bg-[var(--primary)]",
-      red: "bg-[var(--danger)]",
-      green: "bg-[var(--success)]",
-      orange: "bg-[var(--warning)]",
-    } as Record<string, string>
-  )[tone] ?? "bg-[var(--primary)]";
-}
-
 function toneVar(tone: string): string {
   return (
-    { blue: "--primary", red: "--danger", green: "--success", orange: "--warning" } as Record<string, string>
+    { blue: "--primary", red: "--danger", green: "--success", orange: "--warning", purple: "--info" } as Record<string, string>
   )[tone] ?? "--primary";
 }
 

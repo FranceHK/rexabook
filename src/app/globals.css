@@ -385,6 +385,19 @@ input[type="datetime-local"].field {
   animation: fade-up 0.35s ease both;
 }
 
+@keyframes bar-in {
+  from {
+    transform: scaleY(0.05);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.bar-in {
+  animation: bar-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom;
+}
+
 @keyframes lightbox-in {
   from {
     opacity: 0;
