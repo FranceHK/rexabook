@@ -408,6 +408,31 @@ input[type="datetime-local"].field {
   transform-origin: bottom;
 }
 
+/* Progress bars: grow + moving shine */
+@keyframes progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.progress-grow {
+  animation: progress-grow 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: left;
+}
+@keyframes progress-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+.progress-shine {
+  animation: progress-shine 2.4s ease-in-out infinite;
+}
+
 @keyframes slide-in-left {
   from {
     transform: translateX(-18px);

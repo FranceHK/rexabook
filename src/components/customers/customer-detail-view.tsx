@@ -14,6 +14,8 @@ import {
   ReceiptText,
   CheckCircle2,
   Hourglass,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { fmtPesa, fmtTarehe, fmtTareheSaa, initial } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -63,6 +65,12 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
   const [debtOpen, setDebtOpen] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [payTarget, setPayTarget] = useState<PayableDebt | null>(null);
+  const [page, setPage] = useState(0);
+
+  const PER_PAGE = 4;
+  const pageCount = Math.max(1, Math.ceil(debts.length / PER_PAGE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visibleDebts = debts.slice(currentPage * PER_PAGE, currentPage * PER_PAGE + PER_PAGE);
 
   async function futaDeni(d: DetailDebt) {
     if (!window.confirm("Una uhakika wa kufuta deni hili? Hatua hii haiwezi kurudishwa.")) return;
@@ -150,8 +158,12 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
         </Card>
       ) : (
         <div className="space-y-5">
-          {debts.map((d) => (
-            <Card key={d.id} className={cn("overflow-hidden", d.imekamilika && "opacity-90")}>
+          {visibleDebts.map((d, i) => (
+            <Card
+              key={d.id}
+              className={cn("anim-up overflow-hidden", d.imekamilika && "opacity-90")}
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
               <CardBody className="p-0">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
                   <div className="flex items-center gap-3">
@@ -167,9 +179,11 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
                   </div>
                   <div className="flex items-center gap-2">
                     {d.imekamilika ? <Badge tone="done">Imelipwa</Badge> : <Badge tone="wait">Inadaiwa</Badge>}
-                    <Button variant="ghost" size="sm" className="!text-danger" onClick={() => futaDeni(d)} icon={<Trash2 />}>
-                      Futa
-                    </Button>
+                    {d.kiasiKilicholipwa === 0 ? (
+                      <Button variant="ghost" size="sm" className="!text-danger" onClick={() => futaDeni(d)} icon={<Trash2 />}>
+                        Futa
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -229,6 +243,31 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
               </CardBody>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {debts.length > PER_PAGE && (
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={currentPage === 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            className="btn btn-secondary btn-sm disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronLeft className="size-4" /> Iliyopita
+          </button>
+          <p className="text-xs font-medium text-ink-3">
+            Deni {currentPage * PER_PAGE + 1}–{Math.min(debts.length, (currentPage + 1) * PER_PAGE)} kati ya {debts.length}
+          </p>
+          <button
+            type="button"
+            disabled={currentPage >= pageCount - 1}
+            onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+            className="btn btn-secondary btn-sm disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Ijayo <ChevronRight className="size-4" />
+          </button>
         </div>
       )}
 

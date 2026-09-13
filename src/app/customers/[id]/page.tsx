@@ -53,6 +53,12 @@ export default async function CustomerDetailPage({
     };
   });
 
+  // Live debts (not paid) first, settled debts last; each group newest first.
+  debts.sort((a, b) => {
+    if (a.imekamilika !== b.imekamilika) return a.imekamilika ? 1 : -1;
+    return b.tareheKukopa.localeCompare(a.tareheKukopa);
+  });
+
   const totalKikopa = debts.reduce((s, d) => s + d.kiasiAsili, 0);
   const totalLipwa = debts.reduce((s, d) => s + d.kiasiKilicholipwa, 0);
   const totalBakaa = debts.filter((d) => !d.imekamilika).reduce((s, d) => s + bakaaOf(d.kiasiAsili, d.kiasiKilicholipwa), 0);
