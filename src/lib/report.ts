@@ -154,7 +154,7 @@ export async function generatePdfReport(input: PdfReportInput): Promise<Uint8Arr
     const summary: Array<[string, number, string]> = [
       ["Aliokopa:", input.totalKikopa, "black"],
       ["Ame Lipa:", input.totalLipwa, "green"],
-      ["Bakaa:", input.totalBakaa, input.totalBakaa === 0 ? "green" : "orange"],
+      ["Inabakia:", input.totalBakaa, input.totalBakaa === 0 ? "green" : "orange"],
     ];
     for (const [label, value, color] of summary) {
       text(label, MARGIN, 12, fontBold);
@@ -168,7 +168,7 @@ export async function generatePdfReport(input: PdfReportInput): Promise<Uint8Arr
   sectionTitle("MAELEZO YA MADENI");
   {
     const colWidths = [150, 65, 75, 75, 75, 75];
-    const headers = ["Bidhaa/Huduma", "Tarehe", "Asili", "Imelipwa", "Bakaa", "Hali"];
+    const headers = ["Bidhaa/Huduma", "Tarehe", "Asili", "Imelipwa", "Inabakia", "Hali"];
 
     const drawHeader = () => {
       ensureSpace(28);

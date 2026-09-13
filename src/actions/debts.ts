@@ -97,7 +97,7 @@ export async function addPaymentAction(
   const bakaa = Math.max(0, asili - kilicholipwa);
 
   if (kiasi > bakaa + 0.001) {
-    return fail(`Kiasi kinachozidi bakaa. Bakaa ni TZS ${bakaa.toLocaleString("en-TZ", { maximumFractionDigits: 2 })}.`);
+    return fail(`Kiasi kinazidi kinachobaki. Kinachobaki ni TZS ${bakaa.toLocaleString("en-TZ", { maximumFractionDigits: 2 })}.`);
   }
 
   const kipyaKilicholipwa = kilicholipwa + kiasi;
