@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Plus, Users, Phone, MapPin, ChevronDown } from "lucide-react";
+import { Search, Plus, Users, Phone, MapPin, ChevronDown, Wallet, TrendingUp, UserPlus, Clock } from "lucide-react";
 import { fmtPesa, fmtTarehe, initial } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/components/theme/toast-provider";
@@ -60,6 +60,7 @@ export function CustomersView({
   }, [customers, query, sort]);
 
   const totalBakaa = customers.reduce((s, c) => s + c.bakaa, 0);
+  const totalMadeni = customers.reduce((s, c) => s + c.jumlaDeni, 0);
 
   const sortLabels: Record<SortKey, string> = {
     jina: "Jina (A-Z)",
@@ -68,10 +69,12 @@ export function CustomersView({
     mpya: "Wapya Kwanza",
   };
 
+  const sortOpts: SortKey[] = ["jina", "bakaa", "jumla", "mpya"];
+
   const stats = [
-    { label: "Wadaiwa wote", value: customers.length.toLocaleString("en-TZ") },
-    { label: "Madeni yanayoendelea", value: customers.reduce((s, c) => s + c.deniInayoendelea, 0).toLocaleString("en-TZ") },
-    { label: "Jumla imebaki", value: fmtPesa(totalBakaa) },
+    { label: "Wadaiwa", value: customers.length, icon: Users, accent: "--primary" },
+    { label: "Deni Lote", value: fmtPesa(totalMadeni), icon: Wallet, accent: "--info" },
+    { label: "Imebaki", value: fmtPesa(totalBakaa), icon: TrendingUp, accent: "--warning" },
   ];
 
   return (
@@ -79,24 +82,30 @@ export function CustomersView({
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-ink">Wadaiwa</h1>
+          <h1 className="text-2xl font-bold text-ink sm:text-3xl">Wadaiwa</h1>
           <p className="mt-1 text-sm text-ink-3">Simamia wateja wako, madeni yao na malipo.</p>
         </div>
-        <button type="button" onClick={() => setAddOpen(true)} className="btn btn-primary">
+        <button type="button" onClick={() => setAddOpen(true)} className="btn btn-primary shadow-lg shadow-primary/20">
           <Plus className="size-4" /> Mdaiwa Mpya
         </button>
       </div>
 
       {/* Stats row */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {stats.map((s) => (
-          <div key={s.label} className="panel flex items-center gap-4 p-4">
-            <span className="grid size-11 place-items-center rounded-2xl neu-inset text-primary">
-              <Users className="size-5" />
-            </span>
-            <div>
-              <p className="text-xs text-ink-3">{s.label}</p>
-              <p className="text-lg font-semibold text-ink">{s.value}</p>
+        {stats.map(({ label, value, icon: Icon, accent }) => (
+          <div key={label} className="panel group relative overflow-hidden p-4 transition hover:shadow-glass sm:p-5">
+            <div className="absolute inset-x-0 top-0 h-1" style={{ background: `var(${accent})` }} />
+            <div className="flex items-center gap-4">
+              <div
+                className="grid size-12 shrink-0 place-items-center rounded-2xl transition group-hover:scale-105"
+                style={{ background: `color-mix(in srgb, var(${accent}) 14%, transparent)`, color: `var(${accent})` }}
+              >
+                <Icon className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-3">{label}</p>
+                <p className="mt-0.5 text-xl font-bold text-ink sm:text-2xl">{value}</p>
+              </div>
             </div>
           </div>
         ))}
@@ -104,7 +113,7 @@ export function CustomersView({
 
       {/* Toolbar */}
       <div className="panel mb-6 flex flex-wrap items-center gap-3 p-3">
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
           <input
             value={query}
@@ -123,97 +132,127 @@ export function CustomersView({
             {sortLabels[sort]} <ChevronDown className="size-4" />
           </button>
           {sortOpen && (
-            <div className="modal-box absolute right-0 top-full z-30 mt-2 w-44 p-1" onMouseLeave={() => setSortOpen(false)}>
-              {(["jina", "bakaa", "jumla", "mpya"] as SortKey[]).map((k) => (
+            <div className="modal-box absolute right-0 top-full z-30 mt-2 w-48 p-1 shadow-xl" onMouseLeave={() => setSortOpen(false)}>
+              {sortOpts.map((k) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => { setSort(k); setSortOpen(false); }}
                   className={cn(
-                    "block w-full rounded-lg px-3 py-2 text-left text-sm transition",
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition",
                     sort === k ? "bg-primary/10 font-medium text-primary" : "text-ink-2 hover:bg-surface-2"
                   )}
                 >
+                  <span className={cn("size-1.5 rounded-full", sort === k ? "bg-primary" : "bg-ink-3/40")} />
                   {sortLabels[k]}
                 </button>
               ))}
             </div>
           )}
         </div>
+        <span className="hidden text-xs text-ink-3 sm:block">{filtered.length} matokeo</span>
       </div>
 
-      {/* Grid */}
+      {/* Cards */}
       {filtered.length === 0 ? (
-        <div className="panel flex flex-col items-center gap-4 px-6 py-16 text-center">
-          <div className="grid size-16 place-items-center rounded-full neu-inset text-ink-3">
-            <Users className="size-7" />
+        <div className="panel flex flex-col items-center gap-5 px-6 py-20 text-center">
+          <div className="grid size-20 place-items-center rounded-full bg-surface-2 text-ink-3">
+            <Users className="size-8" />
           </div>
           {customers.length === 0 ? (
             <>
-              <p className="text-sm text-ink-2">Hakuna wadaiwa bado. Anza kwa kumuongeza mdaiwa wa kwanza.</p>
+              <div>
+                <p className="text-base font-medium text-ink">Hakuna wadaiwa bado</p>
+                <p className="mt-1 text-sm text-ink-3">Anza kwa kumuongeza mdaiwa wa kwanza kwenye mfumo wako.</p>
+              </div>
               <button type="button" onClick={() => setAddOpen(true)} className="btn btn-primary">
-                <Plus className="size-4" /> Mdaiwa Mpya
+                <UserPlus className="size-4" /> Ongeza Mdaiwa
               </button>
             </>
           ) : (
-            <p className="text-sm text-ink-2">Hakuna mteja anayelingana na utafutaji wako.</p>
+            <div>
+              <p className="text-base font-medium text-ink">Hakuna mteja anayelingana</p>
+              <p className="mt-1 text-sm text-ink-3">Badilisha maneno ya utafutaji na jaribu tena.</p>
+            </div>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((c) => {
-            const hasDebt = c.deniCount > 0;
+            const hasDebt = c.deniInayoendelea > 0;
             const pct = c.jumlaDeni > 0 ? Math.min(100, Math.round((c.jumlaLipwa / c.jumlaDeni) * 100)) : 0;
+            const accent = c.imekamilishaKikamilifu ? "--success" : hasDebt ? "--primary" : "--info";
+
             return (
               <Link
                 key={c.id}
                 href={`/customers/${c.id}`}
-                className="panel group relative overflow-hidden p-5 transition hover:-translate-y-0.5"
+                className="panel group relative overflow-hidden p-0 transition hover:-translate-y-0.5 hover:shadow-glass"
               >
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-12 shrink-0 place-items-center rounded-full neu-inset text-lg font-bold text-primary">
-                      {initial(c.jina)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-[15px] font-semibold text-ink">{c.jina}</p>
-                      <p className="text-xs text-ink-3">Tangu {fmtTarehe(c.tareheKuandikishwa)}</p>
+                {/* Colored accent bar */}
+                <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, var(${accent}), color-mix(in srgb, var(${accent}) 60%, var(--info)))` }} />
+
+                <div className="px-5 pt-4 pb-5">
+                  {/* Name + status */}
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3.5">
+                      <span
+                        className="grid size-12 shrink-0 place-items-center rounded-full text-base font-bold text-white shadow-md"
+                        style={{ background: `linear-gradient(135deg, var(${accent}), color-mix(in srgb, var(--info) 80%, var(${accent})))` }}
+                      >
+                        {initial(c.jina)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-[15px] font-semibold text-ink">{c.jina}</p>
+                        <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-3">
+                          <Clock className="size-3" /> Tangu {fmtTarehe(c.tareheKuandikishwa)}
+                        </p>
+                      </div>
                     </div>
+                    {hasDebt ? (
+                      <span className="badge badge-wait shrink-0">{c.deniInayoendelea} deni</span>
+                    ) : c.imekamilishaKikamilifu ? (
+                      <span className="badge badge-done shrink-0">Kamilifu</span>
+                    ) : null}
                   </div>
-                  {c.deniInayoendelea > 0 ? (
-                    <span className="badge badge-wait">{c.deniInayoendelea} eneo</span>
-                  ) : c.imekamilishaKikamilifu ? (
-                    <span className="badge badge-done">Kamilifu</span>
-                  ) : null}
-                </div>
 
-                <div className="mb-4 space-y-1.5 text-sm">
-                  {c.simu ? (
-                    <p className="flex items-center gap-2 text-ink-2"><Phone className="size-3.5 text-ink-3" /> {c.simu}</p>
-                  ) : null}
-                  {c.location ? (
-                    <p className="flex items-center gap-2 text-ink-2"><MapPin className="size-3.5 text-ink-3" /> {c.location}</p>
-                  ) : null}
-                </div>
-
-                <div className="rounded-xl bg-surface-2 p-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-ink-3">Imebaki</span>
-                    <span className={cn("font-semibold", c.bakaa === 0 ? "text-success" : "text-ink")}>
-                      {fmtPesa(c.bakaa)}
-                    </span>
-                  </div>
-                  {hasDebt ? (
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
-                      <div
-                        className="h-full rounded-full transition-[width] duration-500"
-                        style={{
-                          width: `${pct}%`,
-                          background: "linear-gradient(90deg, var(--primary), var(--success))",
-                        }}
-                      />
+                  {/* Contact info */}
+                  {(c.simu || c.location) ? (
+                    <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-2">
+                      {c.simu ? (
+                        <span className="flex items-center gap-1.5"><Phone className="size-3 text-ink-3" /> {c.simu}</span>
+                      ) : null}
+                      {c.location ? (
+                        <span className="flex items-center gap-1.5"><MapPin className="size-3 text-ink-3" /> {c.location}</span>
+                      ) : null}
                     </div>
                   ) : null}
+
+                  {/* Amount box */}
+                  <div className="rounded-xl bg-surface-2 p-3.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-ink-3">Imebaki</span>
+                      <span className={cn("text-lg font-bold", c.bakaa === 0 ? "text-success" : "text-ink")}>
+                        {fmtPesa(c.bakaa)}
+                      </span>
+                    </div>
+                    {hasDebt ? (
+                      <div className="mt-2.5">
+                        <div className="h-2 overflow-hidden rounded-full bg-surface-3">
+                          <div
+                            className="h-full rounded-full transition-[width] duration-600"
+                            style={{
+                              width: `${pct}%`,
+                              background: "linear-gradient(90deg, var(--primary), var(--success))",
+                            }}
+                          />
+                        </div>
+                        <p className="mt-1.5 text-right text-[11px] text-ink-3">{pct}% imelipwa</p>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-center text-xs font-medium text-success">Limelipwa kikamilifu</p>
+                    )}
+                  </div>
                 </div>
               </Link>
             );
