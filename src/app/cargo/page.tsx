@@ -40,6 +40,7 @@ export default async function CargoPage({
       kitengo: b.kitengo,
       beiKwaKipande: toMoney(b.beiKwaKipande),
       jumla: toMoney(b.jumla),
+      imefika: b.imefika,
     })),
   }));
 

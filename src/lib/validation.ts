@@ -117,6 +117,26 @@ export const cargoHaliSchema = z.object({
   maelezo_fika: z.string().trim().max(1000, "Maelezo ni marefu mno.").optional().or(z.literal("")),
 });
 
+// ── Company payment cards ─────────────────────────────────────────────
+
+export const companyCardSchema = z.object({
+  jina_kampuni: z
+    .string()
+    .trim()
+    .min(1, "Jina la kampuni linahitajika.")
+    .max(150, "Jina la kampuni ni refu mno."),
+  bank: z
+    .string()
+    .trim()
+    .min(1, "Jina la benki linahitajika.")
+    .max(150, "Jina la benki ni refu mno."),
+  namba_malipo: z
+    .string()
+    .trim()
+    .min(1, "Namba ya malipo inahitajika.")
+    .max(100, "Namba ya malipo ni ndefu mno."),
+});
+
 // ── PDF report ────────────────────────────────────────────────────────
 
 export const reportParamsSchema = z

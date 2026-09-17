@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { hash, compare } from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { profileSchema, passwordSchema } from "@/lib/validation";
+import { profileSchema, passwordSchema, companyCardSchema } from "@/lib/validation";
 import { parseZod, fail, type ActionResult } from "@/lib/action-result";
 
 /** Replicates the profile portion of profaili_update.php. */
@@ -76,4 +76,52 @@ export async function changePasswordAction(
   }
 
   return { success: true, message: "Nenosiri limebadilishwa." };
+}
+
+/** Adds a company payment card (company, bank, payment number). */
+export async function addCompanyCardAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const user = await requireUser();
+
+  const parsed = parseZod(companyCardSchema, {
+    jina_kampuni: formData.get("jina_kampuni"),
+    bank: formData.get("bank"),
+    namba_malipo: formData.get("namba_malipo"),
+  });
+  if (!parsed.success) return { success: false, message: parsed.message, fieldErrors: parsed.fieldErrors };
+
+  const { jina_kampuni, bank, namba_malipo } = parsed.data!;
+
+  try {
+    await prisma.companyCard.create({
+      data: {
+        mtumiajiId: user.id,
+        jinaKampuni: jina_kampuni,
+        bank,
+        nambaMalipo: namba_malipo,
+      },
+    });
+  } catch {
+    return fail("Imeshindikana kuhifadhi kadi ya kampuni. Jaribu tena.");
+  }
+
+  revalidatePath("/settings");
+  return { success: true, message: `Kadi ya "${jina_kampuni}" imehifadhiwa.` };
+}
+
+/** Removes a company payment card. */
+export async function deleteCompanyCardAction(cardId: number): Promise<ActionResult> {
+  const user = await requireUser();
+
+  const card = await prisma.companyCard.findFirst({
+    where: { id: cardId, mtumiajiId: user.id },
+  });
+  if (!card) return fail("Kadi haipatikani.");
+
+  await prisma.companyCard.delete({ where: { id: cardId } });
+
+  revalidatePath("/settings");
+  return { success: true, message: "Kadi imefutwa." };
 }

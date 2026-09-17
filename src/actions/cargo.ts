@@ -150,6 +150,36 @@ export async function uploadRisitiAction(
   return { success: true, message: "Risiti imepakiwa." };
 }
 
+/** Marks a single cargo item (row) as arrived; the whole cargo becomes "Imefika" once every item has arrived. */
+export async function markCargoItemArrivedAction(cargoItemId: number): Promise<ActionResult> {
+  const user = await requireUser();
+
+  const item = await prisma.cargoItem.findFirst({
+    where: { id: cargoItemId, cargo: { mtumiajiId: user.id } },
+    include: { cargo: { include: { items: true } } },
+  });
+  if (!item) return fail("Bidhaa haipatikani.");
+
+  if (!item.imefika) {
+    await prisma.cargoItem.update({ where: { id: cargoItemId }, data: { imefika: true } });
+  }
+
+  const zoteZimefika = item.cargo.items.length > 0 && item.cargo.items.every((i) => i.imefika || i.id === cargoItemId);
+
+  if (zoteZimefika && item.cargo.hali !== "Imefika") {
+    await prisma.cargo.update({
+      where: { id: item.cargo.id },
+      data: { hali: "Imefika", tareheKufikaHalisi: item.cargo.tareheKufikaHalisi ?? new Date() },
+    });
+  }
+
+  revalidatePath("/cargo");
+  return {
+    success: true,
+    message: zoteZimefika ? "Mzigo wote umefika! ✅" : "Bidhaa imewekwa kama imefika.",
+  };
+}
+
 /** Replicates mzigo_delete.php – deletes a cargo order (and its items). */
 export async function deleteCargoAction(cargoId: number): Promise<ActionResult> {
   const user = await requireUser();

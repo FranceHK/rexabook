@@ -12,15 +12,15 @@ import {
   Factory,
   ReceiptText,
   MapPin,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fmtPesa, fmtTarehe } from "@/lib/format";
 import { useToast } from "@/components/theme/toast-provider";
 import { CargoFormModal } from "@/components/cargo/cargo-form-modal";
-import { CargoArriveModal } from "@/components/cargo/cargo-arrive-modal";
 import { CargoRisitiModal } from "@/components/cargo/cargo-risiti-modal";
 import { RisitiLightbox } from "@/components/cargo/risiti-lightbox";
-import { deleteCargoAction } from "@/actions/cargo";
+import { deleteCargoAction, markCargoItemArrivedAction } from "@/actions/cargo";
 
 export interface CargoItemClient {
   id: number;
@@ -29,6 +29,7 @@ export interface CargoItemClient {
   kitengo: string;
   beiKwaKipande: number;
   jumla: number;
+  imefika: boolean;
 }
 
 export interface CargoClient {
@@ -61,7 +62,7 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("yote");
   const [addOpen, setAddOpen] = useState(clientNewOpen);
-  const [arriveTarget, setArriveTarget] = useState<CargoClient | null>(null);
+  const [arrivingId, setArrivingId] = useState<number | null>(null);
   const [risitiTarget, setRisitiTarget] = useState<CargoClient | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -74,6 +75,18 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
   async function futaMzigo(c: CargoClient) {
     if (!window.confirm("Una uhakika unataka kufuta mzigo huu? Hatua hii haiwezi kurudishwa.")) return;
     const res = await deleteCargoAction(c.id);
+    if (res.success) {
+      toast(res.message);
+      router.refresh();
+    } else {
+      toast(res.message, "error");
+    }
+  }
+
+  async function wekaImefika(b: CargoItemClient) {
+    setArrivingId(b.id);
+    const res = await markCargoItemArrivedAction(b.id);
+    setArrivingId(null);
     if (res.success) {
       toast(res.message);
       router.refresh();
@@ -166,6 +179,9 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
             const icon = USAFIRI_ICONS[c.ainaUsafiri?.toLowerCase() ?? ""] ?? "📦";
             const imefika = c.hali === "Imefika";
             const imelipwa = Boolean(c.risitiPicha);
+            const jumlaBidhaa = c.bidhaa.length;
+            const imefikaBidhaa = c.bidhaa.filter((b) => b.imefika || imefika).length;
+            const zoteZimefika = jumlaBidhaa > 0 && imefikaBidhaa === jumlaBidhaa;
             return (
               <div
                 key={c.id}
@@ -208,8 +224,8 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
                       </div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      <span className={cn("badge", imefika ? "badge-done" : "badge-wait")}>
-                        {imefika ? "Imefika" : "Haijafika"}
+                      <span className={cn("badge", zoteZimefika ? "badge-done" : "badge-danger")}>
+                        {zoteZimefika ? `✓ Imefika ${imefikaBidhaa}/${jumlaBidhaa}` : `⏳ Imefika ${imefikaBidhaa}/${jumlaBidhaa}`}
                       </span>
                       {imelipwa ? (
                         <span className="badge badge-done">💳 Imelipwa</span>
@@ -222,30 +238,62 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
                   {/* Items table */}
                   <div className="mb-4 overflow-hidden rounded-2xl border border-line">
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[340px] text-left text-sm">
+                      <table className="w-full min-w-[420px] text-left text-sm">
                         <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-ink-3">
                           <tr>
                             <th className="px-3 py-2 font-medium">Bidhaa</th>
                             <th className="px-3 py-2 font-medium">Idadi</th>
                             <th className="px-3 py-2 font-medium">Bei/pc</th>
                             <th className="px-3 py-2 text-right font-medium">Jumla</th>
+                            <th className="px-3 py-2 text-right font-medium">Action</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {c.bidhaa.map((b) => (
-                            <tr key={b.id} className="border-b border-line/60 bg-surface last:border-0 hover:bg-surface-2/60">
-                              <td className="max-w-[130px] truncate px-3 py-2 font-medium text-ink-2">{b.jinaBidhaa}</td>
-                              <td className="px-3 py-2 text-ink-2">
-                                {b.idadi} <span className="text-ink-3">{b.kitengo}</span>
-                              </td>
-                              <td className="px-3 py-2 text-ink-2">{fmtPesa(b.beiKwaKipande)}</td>
-                              <td className="px-3 py-2 text-right font-semibold text-ink">{fmtPesa(b.jumla)}</td>
-                            </tr>
-                          ))}
+                          {c.bidhaa.map((b) => {
+                            const rowImefika = b.imefika || imefika;
+                            const rowBusy = arrivingId === b.id;
+                            return (
+                              <tr
+                                key={b.id}
+                                className={cn(
+                                  "border-b border-line/60 last:border-0 transition-colors",
+                                  rowImefika
+                                    ? "bg-success/5 hover:bg-success/10"
+                                    : "bg-danger/5 hover:bg-danger/10"
+                                )}
+                              >
+                                <td className="max-w-[130px] truncate px-3 py-2 font-medium text-ink-2">{b.jinaBidhaa}</td>
+                                <td className="px-3 py-2 text-ink-2">
+                                  {b.idadi} <span className="text-ink-3">{b.kitengo}</span>
+                                </td>
+                                <td className="px-3 py-2 text-ink-2">{fmtPesa(b.beiKwaKipande)}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-ink">{fmtPesa(b.jumla)}</td>
+                                <td className="px-3 py-2 text-right">
+                                  {rowImefika ? (
+                                    <span className="badge badge-done">✓ Imefika</span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => wekaImefika(b)}
+                                      disabled={rowBusy}
+                                      className="btn btn-success btn-sm !px-2.5 !py-1 text-xs"
+                                    >
+                                      {rowBusy ? (
+                                        <Loader2 className="size-3.5 animate-spin" />
+                                      ) : (
+                                        <CircleCheck className="size-3.5" />
+                                      )}{" "}
+                                      Imefika
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                         <tfoot>
                           <tr className="bg-gradient-to-r from-primary/8 to-primary-2/8">
-                            <td colSpan={3} className="px-3 py-2.5 text-sm font-medium text-ink-2">Jumla ya Gharama Yote</td>
+                            <td colSpan={4} className="px-3 py-2.5 text-sm font-medium text-ink-2">Jumla ya Gharama Yote</td>
                             <td className="px-3 py-2.5 text-right text-base font-bold text-primary">{fmtPesa(c.jumlaGharama)}</td>
                           </tr>
                         </tfoot>
@@ -281,14 +329,6 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
 
                   {/* Actions */}
                   <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
-                    {!imefika ? (
-                      <button type="button" onClick={() => setArriveTarget(c)} className="btn btn-success">
-                        <CircleCheck className="size-4" /> Umefika
-                      </button>
-                    ) : (
-                      <span className="badge badge-done">✓ Imefika</span>
-                    )}
-
                     {!imelipwa ? (
                       <button type="button" onClick={() => setRisitiTarget(c)} className="btn btn-secondary">
                         <ReceiptText className="size-4" /> Weka Risiti
@@ -316,7 +356,6 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
       )}
 
       {addOpen && <CargoFormModal onClose={() => setAddOpen(false)} />}
-      {arriveTarget && <CargoArriveModal cargo={arriveTarget} onClose={() => setArriveTarget(null)} />}
       {risitiTarget && <CargoRisitiModal cargo={risitiTarget} onClose={() => setRisitiTarget(null)} />}
       <RisitiLightbox src={lightbox} onClose={() => setLightbox(null)} />
     </div>
