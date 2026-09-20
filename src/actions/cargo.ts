@@ -1,12 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { cargoCreateSchema, cargoHaliSchema } from "@/lib/validation";
 import { parseZod, fail, type ActionResult } from "@/lib/action-result";
 import { parseDateInput } from "@/lib/format";
 import { imageToDataUri } from "@/lib/uploads";
+import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
 
 export interface CargoItemInput {
   jina_bidhaa: string;
@@ -67,6 +68,8 @@ export async function createCargoAction(input: CargoCreateInput): Promise<Action
   }
 
   revalidatePath("/cargo");
+  revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   return { success: true, message: `Mzigo kutoka "${data.jina_kampuni}" umeongezwa.` };
 }
 
@@ -112,6 +115,8 @@ export async function updateCargoHaliAction(
   }
 
   revalidatePath("/cargo");
+  revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   return { success: true, message: "Hali imesasishwa." };
 }
 
@@ -174,6 +179,8 @@ export async function markCargoItemArrivedAction(cargoItemId: number): Promise<A
   }
 
   revalidatePath("/cargo");
+  revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   return {
     success: true,
     message: zoteZimefika ? "Mzigo wote umefika! ✅" : "Bidhaa imewekwa kama imefika.",
@@ -195,5 +202,7 @@ export async function deleteCargoAction(cargoId: number): Promise<ActionResult> 
   ]);
 
   revalidatePath("/cargo");
+  revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   return { success: true, message: "Mzigo umefutwa." };
 }

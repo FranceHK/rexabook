@@ -1,8 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { hash, compare } from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
 import { requireUser } from "@/lib/auth";
 import { profileSchema, passwordSchema, companyCardSchema } from "@/lib/validation";
 import { parseZod, fail, type ActionResult } from "@/lib/action-result";
@@ -39,6 +40,7 @@ export async function updateProfileAction(
 
   revalidatePath("/settings");
   revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   return { success: true, message: "Taarifa za akaunti zimesasishwa." };
 }
 
@@ -124,4 +126,22 @@ export async function deleteCompanyCardAction(cardId: number): Promise<ActionRes
 
   revalidatePath("/settings");
   return { success: true, message: "Kadi imefutwa." };
+}
+
+/** Deletes a registered user account and all of its data (customers, debts, cargo, SMS). */
+export async function deleteUserAction(userId: number): Promise<ActionResult> {
+  const me = await requireUser();
+  if (userId === me.id) return fail("Huwezi kufuta akaunti yako mwenyewe.");
+
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target) return fail("Mtumiaji hapatikani. Inawezekana ameshafutwa.");
+
+  try {
+    await prisma.user.delete({ where: { id: userId } });
+  } catch {
+    return fail("Imeshindikana kufuta akaunti ya mtumiaji. Jaribu tena.");
+  }
+
+  revalidatePath("/settings");
+  return { success: true, message: `Akaunti ya "${target.jina}" imefutwa pamoja na data yake yote.` };
 }

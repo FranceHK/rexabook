@@ -1,10 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { customerCreateSchema, customerUpdateSchema } from "@/lib/validation";
 import { formDataToObject, parseZod, fail, type ActionResult } from "@/lib/action-result";
+import { buildKumbushoSMS, buildMtejaMpyaSMS, tumaSMS } from "@/lib/sms";
+import { bakaa as bakaaOf, toMoney } from "@/lib/format";
+import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
 
 /** Replicates wateja_add.php – adds a new customer for the signed-in user. */
 export async function createCustomerAction(
@@ -31,8 +34,18 @@ export async function createCustomerAction(
     return fail("Imeshindikana kumhifadhi mteja. Jaribu tena.");
   }
 
+  // Template #1 – welcome SMS to the new customer (best-effort)
+  if (simu) {
+    const ujumbe = buildMtejaMpyaSMS({
+      jinaMteja: jina,
+      jinaDuka: user.jina_duka ?? "Duka",
+    });
+    await tumaSMS(simu, ujumbe);
+  }
+
   revalidatePath("/customers");
   revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   return { success: true, message: `Mteja "${jina}" ameongezwa.` };
 }
 
@@ -64,5 +77,77 @@ export async function updateCustomerAction(
 
   revalidatePath("/customers");
   revalidatePath(`/customers/${mteja_id}`);
+  revalidateTag(DASHBOARD_CACHE_TAG);
   return { success: true, message: "Taarifa za mteja zimesasishwa." };
+}
+
+export async function setCustomerBlockedAction(customerId: number, blocked: boolean): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!Number.isSafeInteger(customerId) || customerId <= 0) return fail("Mteja si sahihi.");
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, mtumiajiId: user.id },
+    select: { id: true, jina: true },
+  });
+  if (!customer) return fail("Mteja hapatikani.");
+
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { imezuiwa: blocked },
+  });
+
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${customer.id}`);
+  revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
+
+  return {
+    success: true,
+    message: blocked
+      ? `${customer.jina} amezuiwa na kufichwa kwenye orodha ya kawaida.`
+      : `${customer.jina} amerudishwa kwenye orodha ya wadaiwa.`,
+  };
+}
+
+export async function sendDebtReminderAction(customerId: number): Promise<ActionResult> {
+  const user = await requireUser();
+  if (!Number.isSafeInteger(customerId) || customerId <= 0) return fail("Mteja si sahihi.");
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, mtumiajiId: user.id },
+    include: {
+      debts: {
+        where: { imekamilika: false },
+        orderBy: { tareheKukopa: "asc" },
+      },
+    },
+  });
+
+  if (!customer) return fail("Mteja hapatikani.");
+  if (!customer.simu) return fail("Ongeza namba ya simu ya mteja kabla ya kutuma ukumbusho.");
+
+  const activeDebts = customer.debts.filter(
+    (debt) => bakaaOf(toMoney(debt.kiasiAsili), toMoney(debt.kiasiKilicholipwa)) > 0
+  );
+  if (activeDebts.length === 0) return fail("Mteja huyu hana deni linaloendelea.");
+
+  const deniLililobaki = activeDebts.reduce(
+    (sum, debt) => sum + bakaaOf(toMoney(debt.kiasiAsili), toMoney(debt.kiasiKilicholipwa)),
+    0
+  );
+  const bidhaaZilizobaki = activeDebts.map((debt) => debt.jinaBidhaa?.trim() || "Deni");
+  const ujumbe = buildKumbushoSMS({
+    jinaMteja: customer.jina,
+    jinaDuka: user.jina_duka ?? "Duka",
+    deniLililobaki,
+    yanayoendelea: activeDebts.length,
+    bidhaaZilizobaki,
+  });
+
+  const sent = await tumaSMS(customer.simu, ujumbe);
+  revalidatePath(`/customers/${customer.id}`);
+
+  return sent
+    ? { success: true, message: `Ukumbusho wa deni umetumwa kwa ${customer.jina}.` }
+    : fail("SMS haijatumwa. Kagua mipangilio ya huduma ya SMS kisha ujaribu tena.");
 }

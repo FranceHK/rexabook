@@ -29,5 +29,9 @@ next-env.d.ts
 /uploads
 /htdocs
 
+# local verification artifacts
+/output/
+/tmp/
+
 # vercel
 .vercel

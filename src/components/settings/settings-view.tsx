@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   UserRound,
+  Users,
   KeyRound,
   MessageSquareText,
   Landmark,
@@ -19,6 +20,7 @@ import {
   changePasswordAction,
   addCompanyCardAction,
   deleteCompanyCardAction,
+  deleteUserAction,
 } from "@/actions/settings";
 import { Card, CardHeader, CardBody } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,15 @@ export interface CompanyCardClient {
   nambaMalipo: string;
 }
 
+export interface AccountClient {
+  id: number;
+  jina: string;
+  jinaDuka: string;
+  simu?: string | null;
+  tareheKuundwa: string;
+  niWewe: boolean;
+}
+
 function initialsOf(jina: string): string {
   return jina
     .split(" ")
@@ -51,10 +62,12 @@ function initialsOf(jina: string): string {
 export function SettingsView({
   user,
   companyCards,
+  accounts,
   smsConfigured,
 }: {
   user: SettingsUser;
   companyCards: CompanyCardClient[];
+  accounts: AccountClient[];
   smsConfigured: boolean;
 }) {
   const { toast } = useToast();
@@ -119,6 +132,23 @@ export function SettingsView({
   async function futaCard(card: CompanyCardClient) {
     if (!window.confirm(`Una uhakika unataka kufuta kadi ya "${card.jinaKampuni}"?`)) return;
     const res = await deleteCompanyCardAction(card.id);
+    if (res.success) {
+      toast(res.message);
+      router.refresh();
+    } else {
+      toast(res.message, "error");
+    }
+  }
+
+  async function futaAccount(acc: AccountClient) {
+    if (
+      !window.confirm(
+        `Una uhakika unataka kufuta akaunti ya "${acc.jina}"? Data yake yote (madini, mizigo, SMS) itafutwa kabisa bila kurudi.`
+      )
+    ) {
+      return;
+    }
+    const res = await deleteUserAction(acc.id);
     if (res.success) {
       toast(res.message);
       router.refresh();
@@ -364,6 +394,70 @@ export function SettingsView({
                   <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">.env</code> ili SMS tume zipite kwa
                   wateja wako. Mfumo utaendelea kufanya kazi bila SMS.
                 </p>
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* Registered accounts */}
+        <Card className="relative overflow-hidden lg:col-span-3">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-danger via-rose-400 to-warning" aria-hidden />
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2.5">
+                <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-danger/12 text-danger">
+                  <Users className="size-4" />
+                </span>
+                Akaunti Zilizosajiriwa
+              </span>
+            }
+            action={<span className="badge shrink-0 badge-info">{accounts.length} akaunti</span>}
+          />
+          <CardBody>
+            <p className="mb-5 text-sm leading-relaxed text-ink-3">
+              Watumiaji wote waliofungua akaunti na kuingia kwenye mfumo. Kufuta akaunti kunafuta pia wateja wake,
+              madeni, mizigo na SMS zake — hatua hii hairejeshwi.
+            </p>
+
+            {accounts.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface-2 px-6 py-10 text-center">
+                <span className="grid size-14 place-items-center rounded-full neu-inset text-ink-3">
+                  <Users className="size-6" />
+                </span>
+                <p className="text-sm text-ink-3">Hakuna akaunti zilizosajiriwa.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {accounts.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface-2 p-4"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-info text-sm font-bold text-white">
+                        {initialsOf(a.jina) || "?"}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-ink">{a.jina}</p>
+                          {a.niWewe ? <span className="badge badge-info">Wewe</span> : null}
+                        </div>
+                        <p className="truncate text-xs text-ink-3">{a.jinaDuka}</p>
+                      </div>
+                    </div>
+                    {!a.niWewe ? (
+                      <button
+                        type="button"
+                        onClick={() => futaAccount(a)}
+                        className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 transition hover:bg-danger/10 hover:text-danger"
+                        aria-label={`Futa akaunti ya ${a.jina}`}
+                        title="Futa akaunti"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
               </div>
             )}
           </CardBody>

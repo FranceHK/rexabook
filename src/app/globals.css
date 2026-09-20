@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Use class-based dark mode (default: dark, matching the original app) */
+/* Use class-based dark mode. Light mode is the default experience. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
@@ -47,31 +47,31 @@
 /*  Design tokens                                                      */
 /* ------------------------------------------------------------------ */
 :root {
-  --bg: #eef2f7;
+  --bg: #f6f8fb;
   --surface: #ffffff;
-  --surface-2: #f3f6fb;
-  --surface-3: #e7edf5;
-  --line: #dde4ee;
-  --line-2: #cdd7e4;
-  --ink: #1c2534;
-  --ink-2: #4c5a70;
-  --ink-3: #8a97ab;
+  --surface-2: #f8fafc;
+  --surface-3: #eef3f8;
+  --line: #e1e7ef;
+  --line-2: #c7d2df;
+  --ink: #172033;
+  --ink-2: #536174;
+  --ink-3: #8a97a8;
 
-  --primary: #5b6cf0;
-  --primary-2: #7c8bf5;
-  --success: #16a34a;
+  --primary: #2563eb;
+  --primary-2: #0ea5e9;
+  --success: #059669;
   --danger: #dc2626;
   --warning: #d97706;
-  --info: #7c5cf0;
+  --info: #7c3aed;
 
-  --glass-bg: rgba(255, 255, 255, 0.66);
-  --glass-line: rgba(28, 37, 52, 0.08);
-  --glass-shadow: 0 8px 32px rgba(28, 37, 52, 0.1);
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-line: rgba(23, 32, 51, 0.08);
+  --glass-shadow: 0 18px 45px rgba(17, 24, 39, 0.08);
 
-  --neu-shadow: 8px 8px 18px rgba(163, 177, 198, 0.6), -8px -8px 18px rgba(255, 255, 255, 0.9);
-  --neu-shadow-sm: 4px 4px 10px rgba(163, 177, 198, 0.55), -4px -4px 10px rgba(255, 255, 255, 0.85);
-  --neu-shadow-lg: 10px 10px 26px rgba(163, 177, 198, 0.65), -10px -10px 26px rgba(255, 255, 255, 0.95);
-  --neu-inset: inset 4px 4px 8px rgba(163, 177, 198, 0.5), inset -4px -4px 8px rgba(255, 255, 255, 0.85);
+  --neu-shadow: 0 18px 40px rgba(17, 24, 39, 0.08);
+  --neu-shadow-sm: 0 8px 22px rgba(17, 24, 39, 0.07);
+  --neu-shadow-lg: 0 24px 60px rgba(17, 24, 39, 0.1);
+  --neu-inset: inset 0 1px 2px rgba(17, 24, 39, 0.08);
 
   --neu-bg: var(--bg);
   color-scheme: light;
@@ -121,7 +121,10 @@ html {
 
 body {
   font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 248, 251, 0.98) 42%),
+    radial-gradient(circle at top left, color-mix(in srgb, var(--primary-2) 10%, transparent), transparent 34%),
+    var(--bg);
   color: var(--ink);
   min-height: 100vh;
   font-size: 15px;
@@ -154,25 +157,29 @@ body {
 /* ------------------------------------------------------------------ */
 .neu {
   background: var(--neu-bg);
-  border-radius: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
   box-shadow: var(--neu-shadow);
 }
 
 .neu-sm {
   background: var(--neu-bg);
-  border-radius: 0.75rem;
+  border-radius: 0.625rem;
+  border: 1px solid var(--line);
   box-shadow: var(--neu-shadow-sm);
 }
 
 .neu-lg {
   background: var(--neu-bg);
-  border-radius: 1.25rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--line);
   box-shadow: var(--neu-shadow-lg);
 }
 
 .neu-inset {
-  background: var(--neu-bg);
-  border-radius: 0.75rem;
+  background: var(--surface-2);
+  border-radius: 0.625rem;
+  border: 1px solid var(--line);
   box-shadow: var(--neu-inset);
 }
 
@@ -214,8 +221,8 @@ body {
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 1rem;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 28px rgba(17, 24, 39, 0.055);
   transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 .dark .panel {
@@ -224,7 +231,7 @@ body {
 .panel-hover:hover {
   transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--primary) 40%, var(--line));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 18px 42px rgba(17, 24, 39, 0.1);
 }
 
 /* ------------------------------------------------------------------ */
@@ -232,9 +239,9 @@ body {
 /* ------------------------------------------------------------------ */
 .field {
   width: 100%;
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 0.65rem;
+  border-radius: 0.625rem;
   padding: 0.6rem 0.85rem;
   font-size: 14px;
   color: var(--ink);
@@ -246,7 +253,7 @@ body {
 }
 .field:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 15%, transparent);
   background: var(--surface);
 }
 select.field {
@@ -481,6 +488,88 @@ input[type="datetime-local"].field {
   animation: pop-in 0.18s ease both;
 }
 
+/* Login background: subtle motion built from lines, not large painted effects. */
+.auth-stage {
+  background: color-mix(in srgb, var(--bg) 78%, #eaf3ff);
+}
+
+.auth-grid-motion {
+  background-image:
+    linear-gradient(rgba(37, 99, 235, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.055) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: auth-grid-drift 24s linear infinite;
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+
+.auth-route {
+  position: absolute;
+  height: 1px;
+  overflow: hidden;
+  background: rgba(37, 99, 235, 0.12);
+  transform-origin: left center;
+}
+
+.auth-route span {
+  display: block;
+  width: 88px;
+  height: 3px;
+  margin-top: -1px;
+  border-radius: 2px;
+  background: #2563eb;
+  animation: auth-route-travel 7s ease-in-out infinite;
+}
+
+.auth-route-a {
+  left: 4%;
+  top: 20%;
+  width: 42%;
+  transform: rotate(-8deg);
+}
+
+.auth-route-b {
+  right: -6%;
+  top: 62%;
+  width: 46%;
+  transform: rotate(12deg);
+}
+
+.auth-route-b span {
+  animation-delay: -2.6s;
+  background: #059669;
+}
+
+.auth-route-c {
+  bottom: 12%;
+  left: 34%;
+  width: 38%;
+  transform: rotate(-3deg);
+}
+
+.auth-route-c span {
+  animation-delay: -4.4s;
+  background: #d97706;
+}
+
+.auth-watermark {
+  animation: auth-watermark-float 9s ease-in-out infinite;
+}
+
+@keyframes auth-grid-drift {
+  to { background-position: 48px 48px; }
+}
+
+@keyframes auth-route-travel {
+  0% { transform: translateX(-100px); opacity: 0; }
+  15%, 80% { opacity: 0.75; }
+  100% { transform: translateX(680px); opacity: 0; }
+}
+
+@keyframes auth-watermark-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(18px, -14px, 0); }
+}
+
 /* Respect users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -539,6 +628,7 @@ input[type="datetime-local"].field {
   -webkit-backdrop-filter: blur(16px) saturate(1.5);
   backdrop-filter: blur(16px) saturate(1.5);
   border-bottom: 1px solid var(--glass-line);
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.06);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -558,7 +648,7 @@ input[type="datetime-local"].field {
   justify-content: center;
   gap: 0.5rem;
   border: none;
-  border-radius: 0.75rem;
+  border-radius: 0.625rem;
   padding: 0.6rem 1.1rem;
   font-size: 14px;
   font-weight: 500;
@@ -580,12 +670,12 @@ input[type="datetime-local"].field {
 .btn-sm {
   padding: 0.4rem 0.8rem;
   font-size: 13px;
-  border-radius: 0.6rem;
+  border-radius: 0.5rem;
 }
 .btn-lg {
   padding: 0.75rem 1.4rem;
   font-size: 15px;
-  border-radius: 0.85rem;
+  border-radius: 0.625rem;
 }
 .btn-icon {
   padding: 0.5rem;
@@ -594,12 +684,12 @@ input[type="datetime-local"].field {
 
 .btn-primary {
   color: #fff;
-  background: linear-gradient(135deg, var(--primary), var(--primary-2));
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--primary) 35%, transparent);
+  background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 70%, var(--primary-2)));
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--primary) 24%, transparent);
 }
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 22px color-mix(in srgb, var(--primary) 45%, transparent);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--primary) 32%, transparent);
 }
 
 .btn-success {
@@ -632,12 +722,13 @@ input[type="datetime-local"].field {
 }
 
 .btn-secondary {
-  background: var(--surface-2);
+  background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: var(--surface-3);
+  background: var(--surface-2);
   border-color: var(--line-2);
 }
 
@@ -651,7 +742,7 @@ input[type="datetime-local"].field {
 }
 
 .btn-outline {
-  background: transparent;
+  background: var(--surface);
   color: var(--primary);
   border: 1px solid color-mix(in srgb, var(--primary) 50%, transparent);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -13,11 +13,13 @@ import {
   Moon,
   Menu,
   X,
-  BookOpenText,
   Store,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/components/theme/theme-provider";
+import { BrandLogo } from "@/components/brand-logo";
 
 interface AppUser {
   jina: string;
@@ -43,7 +45,15 @@ function initialsOf(jina: string): string {
     .toUpperCase();
 }
 
-function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+function NavLinks({
+  pathname,
+  onNavigate,
+  collapsed = false,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+  collapsed?: boolean;
+}) {
   return (
     <nav className="flex flex-col gap-1.5">
       {nav.map(({ href, label, icon: Icon, accent }) => {
@@ -54,24 +64,27 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
             href={href}
             prefetch
             onClick={onNavigate}
+            title={collapsed ? label : undefined}
             className={cn(
-              "group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all duration-200",
+              "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+              collapsed && "justify-center px-2",
               active
-                ? "bg-gradient-to-r from-primary/15 to-primary-2/8 text-ink shadow-sm"
-                : "text-ink-2 hover:translate-x-1 hover:bg-surface-2 hover:text-ink"
+                ? "bg-primary/10 text-primary shadow-sm ring-1 ring-primary/10"
+                : "text-ink-2 hover:bg-surface-2 hover:text-ink"
             )}
           >
+            {active && <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-primary" aria-hidden />}
             <span
               className={cn(
-                "grid size-9 shrink-0 place-items-center rounded-xl transition-all duration-200",
-                active ? `bg-primary/15 ${accent}` : "bg-surface-2 text-ink-3 group-hover:scale-105 group-hover:text-primary"
+                "grid size-9 shrink-0 place-items-center rounded-lg transition-all duration-200",
+                active ? `bg-white shadow-sm ${accent}` : "bg-surface-2 text-ink-3 group-hover:text-primary"
               )}
             >
               <Icon className="size-[18px]" />
             </span>
-            {label}
+            {!collapsed && label}
             {active && (
-              <span className="absolute right-2 size-1.5 rounded-full bg-primary opacity-70" aria-hidden />
+              <span className={cn("absolute right-2 size-1.5 rounded-full bg-primary opacity-70", collapsed && "hidden")} aria-hidden />
             )}
           </Link>
         );
@@ -84,10 +97,12 @@ function LogoutBtn({
   onLogout,
   theme,
   onToggleTheme,
+  collapsed = false,
 }: {
   onLogout: () => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
+  collapsed?: boolean;
 }) {
   return (
     <>
@@ -95,7 +110,7 @@ function LogoutBtn({
         <button
           type="button"
           onClick={onToggleTheme}
-          className="grid size-8 place-items-center rounded-lg text-ink-3 transition hover:bg-surface-2 hover:text-primary"
+          className="grid size-9 place-items-center rounded-lg border border-line bg-surface text-ink-3 shadow-sm transition hover:border-primary/30 hover:text-primary"
           aria-label={theme === "dark" ? "Badilisha kuwa mwangaza" : "Badilisha kuwa giza"}
           title={theme === "dark" ? "Mwangaza" : "Giza"}
         >
@@ -105,12 +120,16 @@ function LogoutBtn({
       <button
         type="button"
         onClick={onLogout}
-        className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-ink-2 transition hover:bg-danger/10 hover:text-danger"
+        title={collapsed ? "Toka" : undefined}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:bg-danger/10 hover:text-danger",
+          collapsed && "justify-center px-2"
+        )}
       >
-        <span className="grid size-9 place-items-center rounded-lg bg-danger/10 text-danger">
+        <span className="grid size-9 place-items-center rounded-lg bg-danger/10 text-danger ring-1 ring-danger/10">
           <LogOut className="size-[18px]" />
         </span>
-        Toka
+        {!collapsed && "Toka"}
       </button>
     </>
   );
@@ -123,6 +142,7 @@ function SidebarBody({
   onLogout,
   theme,
   onToggleTheme,
+  collapsed = false,
 }: {
   user: AppUser;
   pathname: string;
@@ -130,38 +150,44 @@ function SidebarBody({
   onLogout: () => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
+  collapsed?: boolean;
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 px-5 pb-6 pt-7">
-        <div className="grid size-11 place-items-center rounded-2xl text-white shadow-glass bg-gradient-to-br from-primary to-info">
-          <BookOpenText className="size-5" />
+      <div className={cn("border-b border-line/70 px-5 pb-5 pt-6", collapsed && "px-3") }>
+        <div className={cn("mb-4 flex items-center gap-3", collapsed && "justify-center") }>
+          <BrandLogo className={cn("size-12", collapsed && "size-11")} markOnly priority />
+          <div className={cn("min-w-0", collapsed && "hidden")}>
+            <p className="truncate text-lg font-medium leading-tight text-ink">RexaBook</p>
+            <p className="flex items-center gap-1 truncate text-xs text-ink-3">
+              <Store className="size-3" /> {user.jinaDuka}
+            </p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-lg font-medium leading-tight text-ink">RexaBook</p>
-          <p className="flex items-center gap-1 truncate text-xs text-ink-3">
-            <Store className="size-3" /> {user.jinaDuka}
-          </p>
+        <div className={cn("rounded-lg border border-line bg-surface-2 px-3 py-2", collapsed && "hidden")}>
+          <p className="truncate text-xs font-medium text-ink-2">Akaunti ya duka</p>
+          <p className="truncate text-sm font-semibold text-ink">{user.jinaDuka}</p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3">
-        <div className="mb-2 px-3.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+      <div className={cn("flex-1 overflow-y-auto px-3 pt-4", collapsed && "px-2")}>
+        <div className={cn("mb-2 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3", collapsed && "sr-only")}>
           Menyu Kuu
         </div>
-        <NavLinks pathname={pathname} onNavigate={onNavigate} />
+        <NavLinks pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} />
       </div>
 
       <div className="border-t border-line px-3 py-4">
-        <div className="mb-3 flex items-center gap-3 px-2.5">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full rounded-l-xl neu-inset text-sm font-bold text-primary">
+        <div className={cn("mb-3 flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2.5", collapsed && "justify-center px-2")}>
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-sm font-bold text-primary shadow-sm ring-1 ring-line">
             {initialsOf(user.jina)}
           </span>
-          <div className="min-w-0 flex-1">
+          <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
             <p className="truncate text-sm font-medium text-ink">{user.jina}</p>
+            <p className="truncate text-xs text-ink-3">Msimamizi</p>
           </div>
         </div>
-        <LogoutBtn onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} />
+        <LogoutBtn onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} collapsed={collapsed} />
       </div>
     </div>
   );
@@ -172,6 +198,22 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   const router = useRouter();
   const { theme, toggle } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setSidebarCollapsed(window.localStorage.getItem("rexabook-sidebar") === "collapsed");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("rexabook-sidebar", next ? "collapsed" : "expanded");
+      return next;
+    });
+  }
 
   function go(href: string) {
     setMobileOpen(false);
@@ -187,7 +229,21 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
   return (
     <div className="min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-line bg-surface/70 backdrop-blur-xl lg:block">
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 hidden border-r border-line bg-surface/92 shadow-[8px_0_30px_rgba(17,24,39,0.04)] backdrop-blur-xl transition-[width] duration-300 lg:block",
+          sidebarCollapsed ? "w-20" : "w-64"
+        )}
+      >
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="absolute -right-4 top-7 z-10 grid size-8 place-items-center rounded-full border border-line bg-surface text-ink-3 shadow-md transition hover:border-primary/30 hover:text-primary"
+          aria-label={sidebarCollapsed ? "Panua menyu" : "Kunja menyu"}
+          title={sidebarCollapsed ? "Panua menyu" : "Kunja menyu"}
+        >
+          {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+        </button>
         <SidebarBody
           user={user}
           pathname={pathname}
@@ -195,6 +251,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
           onLogout={() => go("/logout")}
           theme={theme}
           onToggleTheme={toggle}
+          collapsed={sidebarCollapsed}
         />
       </aside>
 
@@ -223,19 +280,19 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
         </div>
       )}
 
-      <div className="lg:pl-64">
+      <div className={cn("transition-[padding] duration-300", sidebarCollapsed ? "lg:pl-20" : "lg:pl-64")}>
         {/* Mobile topbar */}
         <header className="glass-nav sticky top-0 z-30 flex items-center justify-between border-b border-line px-4 py-3 lg:hidden">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="grid size-9 place-items-center rounded-lg text-ink-2 transition active:scale-95 hover:bg-surface-2"
+            className="grid size-9 place-items-center rounded-lg border border-line bg-surface text-ink-2 shadow-sm transition active:scale-95 hover:bg-surface-2"
             aria-label="Fungua menyu"
           >
             <Menu className="size-5" />
           </button>
           <span className="text-sm font-medium text-ink">{currentLabel}</span>
-          <span className="grid size-9 place-items-center rounded-full rounded-l-xl neu-inset text-sm font-bold text-primary">
+          <span className="grid size-9 place-items-center rounded-lg bg-surface text-sm font-bold text-primary shadow-sm ring-1 ring-line">
             {initialsOf(user.jina)}
           </span>
         </header>
@@ -249,8 +306,8 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       </div>
 
       {/* Mobile bottom navigation */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto flex max-w-md items-stretch">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(17,24,39,0.08)] backdrop-blur-xl lg:hidden">
+        <div className="mx-auto flex max-w-md items-stretch px-2">
           {mobileNav.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
@@ -260,11 +317,10 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
                 prefetch
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition active:scale-95",
-                  active ? "text-primary" : "text-ink-3 hover:text-ink-2"
+                  "relative my-1 flex flex-1 flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-medium transition active:scale-95",
+                  active ? "bg-primary/10 text-primary" : "text-ink-3 hover:bg-surface-2 hover:text-ink-2"
                 )}
               >
-                {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />}
                 <Icon className="size-5" />
                 {label}
               </Link>

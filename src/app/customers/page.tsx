@@ -33,6 +33,7 @@ export default async function CustomersPage({
       jina: c.jina,
       simu: c.simu,
       location: c.location,
+      imezuiwa: c.imezuiwa,
       tareheKuandikishwa: c.tareheKuandikishwa,
       jumlaDeni,
       jumlaLipwa,

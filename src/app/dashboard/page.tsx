@@ -1,5 +1,6 @@
-import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getSessionUserId } from "@/lib/auth";
+import { getDashboardData } from "@/lib/dashboard-data";
 import { toMoney, fmtPesa, fmtTarehe, fmtTareheRefu, bakaa as bakaaOf, pctPaid, initial } from "@/lib/format";
 import Link from "next/link";
 import { AppShell } from "@/components/layout/app-shell";
@@ -22,6 +23,11 @@ import {
   HandCoins,
   PackagePlus,
   ReceiptText,
+  Package,
+  Truck,
+  Boxes,
+  Factory,
+  CalendarClock,
 } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -30,14 +36,14 @@ export const metadata: Metadata = { title: "Dashibodi" };
 const DELAY = ["0ms", "60ms", "120ms", "180ms"];
 
 export default async function DashboardPage() {
-  const user = await requireUser();
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
 
-  const watejaCount = await prisma.customer.count({ where: { mtumiajiId: user.id } });
+  const dashboardData = await getDashboardData(userId);
+  if (!dashboardData) redirect("/login");
+  const { user, watejaCount, madeni, malipoKaribuni, chartPayments, cargos } = dashboardData;
 
-  const madeni = await prisma.debt.findMany({
-    where: { mtumiajiId: user.id },
-    select: { id: true, kiasiAsili: true, kiasiKilicholipwa: true, imekamilika: true, tareheKukopa: true, jinaBidhaa: true, mtejaId: true, customer: { select: { jina: true, id: true } } },
-  });
+  const now = new Date();
 
   const jumlaMadeni = madeni.reduce((s, d) => s + toMoney(d.kiasiAsili), 0);
   const jumlaLipwa = madeni.reduce((s, d) => s + toMoney(d.kiasiKilicholipwa), 0);
@@ -46,18 +52,10 @@ export default async function DashboardPage() {
   const paidPct = jumlaMadeni > 0 ? Math.round((jumlaLipwa / jumlaMadeni) * 100) : 0;
 
   const madeniKaribuni = [...madeni]
-    .sort((a, b) => b.tareheKukopa.getTime() - a.tareheKukopa.getTime())
+    .sort((a, b) => new Date(b.tareheKukopa).getTime() - new Date(a.tareheKukopa).getTime())
     .slice(0, 8);
 
-  const malipoKaribuni = await prisma.payment.findMany({
-    where: { debt: { mtumiajiId: user.id } },
-    include: { debt: { select: { customer: { select: { jina: true } }, jinaBidhaa: true } } },
-    orderBy: { tarehe: "desc" },
-    take: 5,
-  });
-
-  // Last 7 days of payments for the chart
-  const now = new Date();
+  // Last 7 days of payments for the chart, grouped after one database read.
   const chartData: ChartPoint[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
@@ -65,19 +63,27 @@ export default async function DashboardPage() {
     d.setDate(d.getDate() - i);
     const next = new Date(d);
     next.setDate(d.getDate() + 1);
-    const sum = await prisma.payment.aggregate({
-      where: { debt: { mtumiajiId: user.id }, tarehe: { gte: d, lt: next } },
-      _sum: { kiasi: true },
-    });
     chartData.push({
       label: `${d.getDate()}/${d.getMonth() + 1}`,
-      value: toMoney(sum._sum.kiasi),
+      value: chartPayments
+        .filter((payment) => {
+          const paymentDate = new Date(payment.tarehe);
+          return paymentDate >= d && paymentDate < next;
+        })
+        .reduce((sum, payment) => sum + toMoney(payment.kiasi), 0),
     });
   }
 
-  const activeCargo = await prisma.cargo.count({
-    where: { mtumiajiId: user.id, hali: "Haijafika" },
-  });
+  const activeCargo = cargos.filter((cargo) => cargo.hali === "Haijafika").length;
+  const arrivedCargo = cargos.length - activeCargo;
+  const totalCargoValue = cargos.reduce((sum, cargo) => sum + toMoney(cargo.jumlaGharama), 0);
+  const cargoItemsCount = cargos.reduce((sum, cargo) => sum + cargo.items.length, 0);
+  const arrivedCargoItems = cargos.reduce(
+    (sum, cargo) => sum + cargo.items.filter((item) => item.imefika || cargo.hali === "Imefika").length,
+    0
+  );
+  const cargoProgress = cargoItemsCount > 0 ? Math.round((arrivedCargoItems / cargoItemsCount) * 100) : 0;
+  const recentCargo = cargos.slice(0, 4);
 
   const today = fmtTareheRefu(new Date());
   const firstName = user.jina.split("@")[0].split(".")[0] || user.jina;
@@ -100,7 +106,7 @@ export default async function DashboardPage() {
     <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka }}>
       {/* ============ Hero ============ */}
       <section
-        className="anim-up relative mb-8 overflow-hidden rounded-3xl p-6 text-white shadow-glass md:p-8"
+        className="anim-up relative mb-8 overflow-hidden rounded-2xl p-6 text-white shadow-glass md:p-8"
         style={{
           backgroundImage:
             "linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary-2) 70%, var(--primary)) 55%, var(--info) 100%)",
@@ -110,7 +116,6 @@ export default async function DashboardPage() {
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(255,255,255,0.4)_1px,transparent_1px);background-size:22px_22px]"
         />
-        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-white/10 blur-3xl" />
 
         <div className="relative flex flex-wrap items-end justify-between gap-6">
           <div>
@@ -118,7 +123,7 @@ export default async function DashboardPage() {
               <Sparkles className="size-3.5" /> Dashibodi · {user.jina_duka}
             </p>
             <h1 className="mt-2 text-2xl font-semibold leading-snug md:text-3xl">
-              Karibu tena, {firstName} 👋
+              Karibu tena, {firstName}
             </h1>
             <p className="mt-1 text-sm text-white/80">{today}</p>
 
@@ -179,6 +184,112 @@ export default async function DashboardPage() {
             </div>
           </div>
         ))}
+      </section>
+
+      {/* ============ Cargo overview ============ */}
+      <section className="mb-8 overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface-2/70 px-5 py-4 sm:px-6">
+          <div>
+            <p className="flex items-center gap-2 text-base font-semibold text-ink">
+              <Boxes className="size-5 text-success" /> Muhtasari wa Mizigo
+            </p>
+            <p className="mt-1 text-xs text-ink-3">Hali ya mizigo na bidhaa ulizoagiza</p>
+          </div>
+          <Link href="/cargo" className="btn btn-soft btn-sm">
+            Ona mizigo yote <ArrowUpRight className="size-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid border-b border-line sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Mizigo yote", value: cargos.length.toLocaleString("en-TZ"), icon: Package, color: "var(--primary)" },
+            { label: "Ipo njiani", value: activeCargo.toLocaleString("en-TZ"), icon: Truck, color: "var(--warning)" },
+            { label: "Imefika", value: arrivedCargo.toLocaleString("en-TZ"), icon: CheckCircle2, color: "var(--success)" },
+            { label: "Thamani ya mizigo", value: fmtPesa(totalCargoValue), icon: Wallet, color: "var(--info)" },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="flex items-center gap-3 border-b border-line p-5 last:border-b-0 sm:[&:nth-child(odd)]:border-r xl:border-b-0 xl:border-r xl:last:border-r-0">
+              <span className="grid size-10 shrink-0 place-items-center rounded-lg" style={{ background: `color-mix(in srgb, ${color} 12%, transparent)`, color }}>
+                <Icon className="size-[18px]" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs text-ink-3">{label}</p>
+                <p className="mt-0.5 truncate text-lg font-bold text-ink">{value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.7fr)]">
+          <div className="border-b border-line lg:border-b-0 lg:border-r">
+            <div className="flex items-center justify-between px-5 pb-2 pt-5 sm:px-6">
+              <p className="text-sm font-semibold text-ink">Mizigo ya karibuni</p>
+              <span className="text-xs text-ink-3">{recentCargo.length} ya mwisho</span>
+            </div>
+            {recentCargo.length === 0 ? (
+              <div className="px-5 py-10 text-center sm:px-6">
+                <Package className="mx-auto size-7 text-ink-3" />
+                <p className="mt-2 text-sm text-ink-3">Hakuna mizigo iliyoandikwa bado.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-line/70">
+                {recentCargo.map((cargo) => {
+                  const arrivedItems = cargo.items.filter((item) => item.imefika || cargo.hali === "Imefika").length;
+                  const totalItems = cargo.items.length;
+                  const progress = totalItems > 0 ? Math.round((arrivedItems / totalItems) * 100) : 0;
+                  return (
+                    <Link key={cargo.id} href="/cargo" className="group grid gap-3 px-5 py-3.5 transition hover:bg-surface-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-6">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-success/10 text-success">
+                          <Factory className="size-[18px]" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-ink group-hover:text-primary">{cargo.jinaKampuni}</p>
+                          <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-ink-3">
+                            <CalendarClock className="size-3" /> {fmtTarehe(cargo.tareheKuagiza)} · {totalItems} bidhaa
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 sm:min-w-[210px]">
+                        <div className="min-w-0 flex-1">
+                          <div className="h-1.5 overflow-hidden rounded-full bg-surface-3">
+                            <div className="h-full rounded-full bg-success" style={{ width: `${progress}%` }} />
+                          </div>
+                          <p className="mt-1 text-[11px] text-ink-3">{arrivedItems}/{totalItems} zimefika</p>
+                        </div>
+                        <Badge tone={cargo.hali === "Imefika" ? "done" : "wait"}>
+                          {cargo.hali === "Imefika" ? "Imefika" : "Njiani"}
+                        </Badge>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="p-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-ink">Maendeleo ya bidhaa</p>
+                <p className="mt-1 text-xs text-ink-3">Bidhaa zilizowasili</p>
+              </div>
+              <span className="text-2xl font-bold text-success">{cargoProgress}%</span>
+            </div>
+            <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-surface-3">
+              <div className="h-full rounded-full bg-gradient-to-r from-success to-primary-2 transition-[width] duration-700" style={{ width: `${cargoProgress}%` }} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-success/8 p-3">
+                <p className="text-xs text-ink-3">Zimefika</p>
+                <p className="mt-1 text-lg font-bold text-success">{arrivedCargoItems}</p>
+              </div>
+              <div className="rounded-lg bg-warning/8 p-3">
+                <p className="text-xs text-ink-3">Zinasubiriwa</p>
+                <p className="mt-1 text-lg font-bold text-warning">{Math.max(cargoItemsCount - arrivedCargoItems, 0)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ============ Health + chart ============ */}

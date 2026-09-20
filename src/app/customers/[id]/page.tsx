@@ -5,6 +5,8 @@ import { requireUser } from "@/lib/auth";
 import { toMoney, bakaa as bakaaOf } from "@/lib/format";
 import { AppShell } from "@/components/layout/app-shell";
 import { CustomerDetailView, type CustomerDetailData } from "@/components/customers/customer-detail-view";
+import { customerPublicId } from "@/lib/customer-access";
+import { buildKumbushoSMS } from "@/lib/sms";
 
 export const metadata: Metadata = { title: "Mdaiwa" };
 
@@ -62,6 +64,15 @@ export default async function CustomerDetailPage({
   const totalKikopa = debts.reduce((s, d) => s + d.kiasiAsili, 0);
   const totalLipwa = debts.reduce((s, d) => s + d.kiasiKilicholipwa, 0);
   const totalBakaa = debts.filter((d) => !d.imekamilika).reduce((s, d) => s + bakaaOf(d.kiasiAsili, d.kiasiKilicholipwa), 0);
+  const activeDebts = debts.filter((d) => !d.imekamilika && d.bakaa > 0);
+
+  const smsLog = customer.simu
+    ? await prisma.smsLog.findMany({
+        where: { namba: customer.simu },
+        orderBy: { tarehe: "desc" },
+        take: 12,
+      })
+    : [];
 
   const data: CustomerDetailData = {
     customer: {
@@ -69,11 +80,28 @@ export default async function CustomerDetailPage({
       jina: customer.jina,
       simu: customer.simu,
       location: customer.location,
+      imezuiwa: customer.imezuiwa,
+      publicId: customerPublicId(customer.id),
       tareheKuandikishwa: customer.tareheKuandikishwa.toISOString(),
     },
     debts,
     totals: { kikopa: totalKikopa, lipwa: totalLipwa, bakaa: totalBakaa },
     counts: { total: debts.length, active: debts.filter((d) => !d.imekamilika).length },
+    reminderMessage: activeDebts.length > 0
+      ? buildKumbushoSMS({
+          jinaMteja: customer.jina,
+          jinaDuka: user.jina_duka ?? "Duka",
+          deniLililobaki: totalBakaa,
+          yanayoendelea: activeDebts.length,
+          bidhaaZilizobaki: activeDebts.map((d) => d.jinaBidhaa?.trim() || "Deni"),
+        })
+      : null,
+    sms: smsLog.map((s) => ({
+      id: s.id,
+      ujumbe: s.ujumbe,
+      status: s.status,
+      tarehe: s.tarehe.toISOString(),
+    })),
   };
 
   return (

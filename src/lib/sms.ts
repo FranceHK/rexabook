@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import { fmtPesa } from "@/lib/format";
 
 const MESEJI_URL = "https://meseji.co.tz/api/v1/sms/send";
 
@@ -12,80 +11,91 @@ export interface MalipoSMSData {
   jinaMteja: string;
   malipoKiasi: number;
   bidhaa: string;
+  kiasiDeni: number;
   bakaaBidhaa: number;
   jumlaMadeniYote: number;
   jinaDuka: string;
 }
 
+export interface KumbushoSMSData {
+  jinaMteja: string;
+  jinaDuka: string;
+  deniLililobaki: number;
+  yanayoendelea: number;
+  bidhaaZilizobaki: string[];
+}
+
+/** Branded shop name shown at the start of every SMS. */
+function shopHeader(jinaDuka: string): string {
+  return (jinaDuka || "DUKA").trim().toUpperCase();
+}
+
+/** Formats money as "TSh 50,000" (as used in the official SMS templates). */
+function tsh(value: number): string {
+  return "TSh " + Math.round(value).toLocaleString("en-TZ");
+}
+
 /**
- * Builds the Swahili SMS message sent to a customer after a payment,
- * preserving the three scenarios from the original implementation:
- *   1. everything paid off  2. this product paid, other debts remain
- *   3. balance still remaining on this product.
+ * Template #1 – Customer created:
+ * "MSAFIRI STORE: Habari [Jina], akaunti yako ya madeni imefunguliwa kwa mafanikio.
+ *  Karibu na asante kwa kufanya biashara nasi."
+ */
+export function buildMtejaMpyaSMS(d: { jinaMteja: string; jinaDuka: string }): string {
+  return `${shopHeader(d.jinaDuka)}: Habari ${d.jinaMteja}, akaunti yako ya madeni imefunguliwa kwa mafanikio. Karibu na asante kwa kufanya biashara nasi.`;
+}
+
+/**
+ * Template #2 – New debt added:
+ * "MSAFIRI STORE: Habari [Jina], umeongezewa deni la TSh [Kiasi] kwa [Maelezo].
+ *  Jumla ya deni lako sasa ni TSh [Jumla ya Deni]. Asante."
+ */
+export function buildDeniSMS(d: DeniSMSData): string {
+  const duka = shopHeader(d.jinaDuka);
+  const maelezo = d.maelezo?.trim() || d.bidhaa;
+  return `${duka}: Habari ${d.jinaMteja}, umeongezewa deni la ${tsh(d.kiasi)} kwa ${maelezo}. Jumla ya deni lako sasa ni ${tsh(d.jumlaDeni)}. Asante.`;
+}
+
+/** Builds the manual debt reminder shown for review before it is sent. */
+export function buildKumbushoSMS(d: KumbushoSMSData): string {
+  const bidhaa = d.bidhaaZilizobaki.length > 0
+    ? d.bidhaaZilizobaki.join(", ")
+    : "Hakuna";
+
+  return `${shopHeader(d.jinaDuka)}: Habari ${d.jinaMteja}, huu ni ukumbusho wa deni lako. Deni lililobaki: ${tsh(d.deniLililobaki)}. Yanayoendelea: ${d.yanayoendelea}. Bidhaa zilizobaki: ${bidhaa}. Tafadhali wasiliana nasi au fanya malipo. Asante.`;
+}
+
+/**
+ * Payment SMS branches (logiki rasmi):
+ *   - balance still remaining on this debt        → #3 Kupunguza Deni
+ *   - this debt completed but others remain       → #4 Deni Moja Limekamilika
+ *   - all debts at TSh 0                          → #5 Madeni Yote Yamekamilika
+ * Only ONE SMS is ever sent per payment – when everything is 0, #5 wins.
  */
 export function buildMalipoSMS(d: MalipoSMSData): string {
-  const lipa = fmtPesa(d.malipoKiasi);
-  const bakaa = fmtPesa(d.bakaaBidhaa);
-  const jumla = fmtPesa(d.jumlaMadeniYote);
+  const duka = shopHeader(d.jinaDuka);
+  const lipa = tsh(d.malipoKiasi);
 
   if (d.bakaaBidhaa <= 0 && d.jumlaMadeniYote <= 0) {
-    return [
-      `Habari ${d.jinaMteja},`,
-      ``,
-      `Malipo ya ${lipa} yamepokewa.`,
-      `Bidhaa: ${d.bidhaa} - IMELIPWA KIKAMILIFU ✓`,
-      ``,
-      `Hongera! Huna deni lolote tena kwenye ${d.jinaDuka}.`,
-      `Tunakushukuru kwa uaminifu wako. Karibu tena wakati wowote!`,
-    ].join("\n");
+    // #5 – all debts paid off
+    return `${duka}: Habari ${d.jinaMteja}, tumepokea malipo yako ya mwisho ya ${lipa}. Madeni yako yote yamekamilika na kwa sasa huna deni lolote. Asante kwa kufanya malipo yako.`;
   }
 
   if (d.bakaaBidhaa <= 0) {
-    return [
-      `Habari ${d.jinaMteja},`,
-      ``,
-      `Malipo ya ${lipa} yamepokewa.`,
-      `Bidhaa: ${d.bidhaa} - IMELIPWA KIKAMILIFU ✓`,
-      ``,
-      `Deni lote unalodaiwa: ${jumla}`,
-      ``,
-      `Asante sana kwa kulipa. Endelea hivyo hivyo, tunakuamini! - ${d.jinaDuka}`,
-    ].join("\n");
+    // #4 – this debt completed, other debts remain
+    return `${duka}: Habari ${d.jinaMteja}, deni la ${d.bidhaa} la ${tsh(d.kiasiDeni)} limekamilika. Hata hivyo, una madeni mengine yenye jumla ya ${tsh(d.jumlaMadeniYote)}. Asante kwa malipo yako.`;
   }
 
-  return [
-    `Habari ${d.jinaMteja},`,
-    ``,
-    `Malipo ya ${lipa} yamepokewa.`,
-    `Bidhaa: ${d.bidhaa}`,
-    `Imebaki (bidhaa hii): ${bakaa}`,
-    `Deni lote unalodaiwa: ${jumla}`,
-    ``,
-    `Asante kwa malipo yako. Tafadhali endelea kulipa ili kumalizia deni lako. Tunakushukuru! - ${d.jinaDuka}`,
-  ].join("\n");
+  // #3 – balance still remaining on this debt
+  return `${duka}: Habari ${d.jinaMteja}, tumepokea malipo ya ${lipa}. Salio la deni lako sasa ni ${tsh(d.bakaaBidhaa)}. Jumla ya madeni yako yaliyobaki ni ${tsh(d.jumlaMadeniYote)}. Asante kwa malipo yako.`;
 }
 
 export interface DeniSMSData {
   jinaMteja: string;
   bidhaa: string;
-  kiasi: number;
   maelezo?: string;
+  kiasi: number;
+  jumlaDeni: number;
   jinaDuka: string;
-}
-
-/** SMS sent to a customer when a new debt is registered. */
-export function buildDeniSMS(d: DeniSMSData): string {
-  return [
-    `Habari ${d.jinaMteja},`,
-    ``,
-    `Umeongezewa deni: ${d.bidhaa}`,
-    `Kiasi: ${fmtPesa(d.kiasi)}`,
-    d.maelezo ? `Maelezo: ${d.maelezo}` : null,
-    ``,
-    `Tafadhali lipa kwa wakati uliokubaliwa. Asante kwa uaminifu wako! - ${d.jinaDuka}`,
-  ]
-    .filter((l): l is string => l !== null)
-    .join("\n");
 }
 
 /**

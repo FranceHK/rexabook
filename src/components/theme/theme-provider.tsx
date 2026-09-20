@@ -12,7 +12,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: "dark",
+  theme: "light",
   toggle: () => {},
   setTheme: () => {},
 });
@@ -26,7 +26,7 @@ function readInitialTheme(): Theme {
     // The root layout script already applied the class before paint.
     return document.documentElement.classList.contains("dark") ? "dark" : "light";
   }
-  return "dark";
+  return "light";
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

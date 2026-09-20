@@ -1,12 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { debtCreateSchema, paymentSchema } from "@/lib/validation";
 import { formDataToObject, parseZod, fail, type ActionResult } from "@/lib/action-result";
 import { toMoney, parseDateInput, bakaa as bakaaOf } from "@/lib/format";
 import { buildDeniSMS, buildMalipoSMS, tumaSMS } from "@/lib/sms";
+import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
 
 async function ensureOwnedDebt(userId: number, deniId: number) {
   return prisma.debt.findFirst({
@@ -54,17 +55,24 @@ export async function createDebtAction(
 
   // SMS notification for the new debt (best-effort)
   if (owned.simu) {
+    const madeni = await prisma.debt.findMany({
+      where: { mtejaId: mteja_id, mtumiajiId: user.id, imekamilika: false },
+    });
+    const jumlaDeni = madeni.reduce((sum, d) => sum + bakaaOf(d.kiasiAsili, d.kiasiKilicholipwa), 0);
+
     const ujumbe = buildDeniSMS({
       jinaMteja: owned.jina,
       bidhaa: jina_bidhaa,
       kiasi,
       maelezo: maelezo || undefined,
+      jumlaDeni,
       jinaDuka: user.jina_duka ?? "Duka",
     });
     await tumaSMS(owned.simu, ujumbe);
   }
 
   revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   revalidatePath(`/customers/${mteja_id}`);
   return { success: true, message: `Deni "${jina_bidhaa}" limeongezwa.` };
 }
@@ -84,6 +92,7 @@ export async function deleteDebtAction(deniId: number): Promise<ActionResult> {
   ]);
 
   revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   revalidatePath(`/customers/${deni.mtejaId || ""}`);
   return { success: true, message: "Deni limefutwa." };
 }
@@ -142,6 +151,7 @@ export async function addPaymentAction(
       jinaMteja: deni.customer!.jina,
       malipoKiasi: kiasi,
       bidhaa: deni.jinaBidhaa ?? "deni",
+      kiasiDeni: asili,
       bakaaBidhaa: Math.max(0, asili - kipyaKilicholipwa),
       jumlaMadeniYote,
       jinaDuka: userInfo?.jina_duka ?? "Duka",
@@ -152,6 +162,7 @@ export async function addPaymentAction(
   const ujumbe = imekamilika ? "Hongera! Deni limelipwa kikamilifu! 🎉" : "Malipo yamepokelewa.";
 
   revalidatePath("/dashboard");
+  revalidateTag(DASHBOARD_CACHE_TAG);
   revalidatePath(`/customers/${deni.mtejaId || ""}`);
 
   return { success: true, message: ujumbe };

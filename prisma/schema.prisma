@@ -64,6 +64,7 @@ model Customer {
   jina                 String   @db.VarChar(100)
   simu                 String?  @db.VarChar(20)
   location             String?  @db.VarChar(150)
+  imezuiwa             Boolean  @default(false)
   tareheKuandikishwa   DateTime @default(now())
 
   user   User?  @relation(fields: [mtumiajiId], references: [id], onDelete: Cascade)

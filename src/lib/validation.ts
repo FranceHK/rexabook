@@ -142,7 +142,7 @@ export const companyCardSchema = z.object({
 export const reportParamsSchema = z
   .object({
     mteja_id: z.coerce.number().int().positive(),
-    report_type: z.enum(["wiki", "mwezi", "miezi_3", "miezi_6", "mwaka", "custom"]),
+    report_type: z.enum(["yote", "wiki", "mwezi", "miezi_3", "miezi_6", "mwaka", "custom"]),
     start_date: z.string().optional().or(z.literal("")),
     end_date: z.string().optional().or(z.literal("")),
     include_payments: z.coerce.boolean().default(true),

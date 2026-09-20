@@ -4,6 +4,12 @@ import { prisma } from "@/lib/db";
 import { reportParamsSchema } from "@/lib/validation";
 import { generatePdfReport, type PdfDebtRow } from "@/lib/report";
 import { toMoney } from "@/lib/format";
+import { customerPublicId } from "@/lib/customer-access";
+
+function fmtReportDate(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+}
 
 function rangeFor(type: string, now: Date, start?: string, end?: string): { start: Date; end: Date } {
   const s = new Date(now);
@@ -12,6 +18,9 @@ function rangeFor(type: string, now: Date, start?: string, end?: string): { star
   e.setHours(23, 59, 59, 999);
 
   switch (type) {
+    case "yote":
+      s.setFullYear(2000, 0, 1);
+      break;
     case "wiki":
       s.setDate(s.getDate() - 6);
       break;
@@ -47,6 +56,7 @@ function rangeFor(type: string, now: Date, start?: string, end?: string): { star
 }
 
 const REPORT_LABELS: Record<string, string> = {
+  yote: "Ripoti ya Madeni - Historia Yote",
   wiki: "Ripoti ya Madeni - Wiki ya Mwisho",
   mwezi: "Ripoti ya Madeni - Mwezi Huu",
   miezi_3: "Ripoti ya Madeni - Miezi 3 Iliyopita",
@@ -80,6 +90,7 @@ export async function GET(req: NextRequest) {
 
   const customer = await prisma.customer.findFirst({
     where: { id: mteja_id, mtumiajiId: userId },
+    include: { user: { select: { jina_duka: true } } },
   });
   if (!customer) {
     return NextResponse.json({ ujumbe: "Mteja hapatikani." }, { status: 404 });
@@ -118,12 +129,19 @@ export async function GET(req: NextRequest) {
   const totalBakaa = Math.max(0, totalKikopa - totalLipwa);
 
   const bytes = await generatePdfReport({
-    customer: { jina: customer.jina, simu: customer.simu, location: customer.location },
+    customer: {
+      jina: customer.jina,
+      simu: customer.simu,
+      location: customer.location,
+      publicId: customerPublicId(customer.id),
+    },
+    storeName: customer.user?.jina_duka ?? "RexaBook",
     debts: rows,
     totalKikopa,
     totalLipwa,
     totalBakaa,
     reportTitle: REPORT_LABELS[report_type] ?? "Ripoti ya Madeni",
+    periodLabel: `${fmtReportDate(start)} - ${fmtReportDate(end)}`,
     generatedAt: now,
   });
 

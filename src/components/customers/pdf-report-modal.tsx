@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileDown } from "lucide-react";
+import { CheckCircle2, FileDown, FileText } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/theme/toast-provider";
 
-type ReportType = "wiki" | "mwezi" | "miezi_3" | "miezi_6" | "mwaka" | "custom";
+type ReportType = "yote" | "wiki" | "mwezi" | "miezi_3" | "miezi_6" | "mwaka" | "custom";
 
 const REPORT_LABELS: Record<ReportType, string> = {
+  yote: "Historia Yote",
   wiki: "Wiki ya Mwisho (siku 7)",
   mwezi: "Mwezi Huu",
   miezi_3: "Miezi 3 Iliyopita",
@@ -32,7 +33,7 @@ export function PdfReportModal({
   const { toast } = useToast();
   const router = useRouter();
 
-  const [type, setType] = useState<ReportType>("mwezi");
+  const [type, setType] = useState<ReportType>("yote");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [includePayments, setIncludePayments] = useState(true);
@@ -99,11 +100,21 @@ export function PdfReportModal({
     <Modal
       open={open}
       onClose={loading ? () => {} : onClose}
-      title="Ripoti ya PDF"
-      subtitle="Chagua kipindi cha madeni ya mdaiwa huyu."
+      title="Ripoti ya Mdaiwa"
+      subtitle="Tengeneza taarifa rasmi ya madeni na malipo."
       maxWidth="max-w-md"
     >
       <div className="space-y-4">
+        <div className="flex items-start gap-3 rounded-lg border border-primary/15 bg-primary/5 p-4">
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+            <FileText className="size-[18px]" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink">PDF yenye muhtasari kamili</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-3">Inajumuisha namba ya mdaiwa, jumla ya deni, kilicholipwa, salio na maelezo ya kila deni.</p>
+          </div>
+        </div>
+
         <Select label="Kipindi cha ripoti" value={type} onChange={(e) => setType(e.target.value as ReportType)}>
           {(Object.keys(REPORT_LABELS) as ReportType[]).map((t) => (
             <option key={t} value={t}>{REPORT_LABELS[t]}</option>
@@ -117,14 +128,18 @@ export function PdfReportModal({
           </div>
         )}
 
-        <label className="flex items-center gap-2 text-sm text-ink-2">
+        <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-line bg-surface-2 p-3 text-sm text-ink-2">
           <input
             type="checkbox"
             className="size-4 rounded accent-[var(--primary)]"
             checked={includePayments}
             onChange={(e) => setIncludePayments(e.target.checked)}
           />
-          Jumuisha historia ya malipo ya kila deni
+          <span className="flex-1">
+            <span className="block font-medium text-ink">Historia ya malipo</span>
+            <span className="mt-0.5 block text-xs text-ink-3">Onyesha kila malipo ndani ya ripoti</span>
+          </span>
+          {includePayments ? <CheckCircle2 className="size-4 text-success" /> : null}
         </label>
 
         <div className="flex justify-end gap-3 pt-2">
