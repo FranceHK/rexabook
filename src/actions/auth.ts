@@ -66,12 +66,16 @@ export async function registerAction(
 
   let user;
   try {
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
     user = await prisma.user.create({
       data: {
         jina,
         jina_duka: jinaDuka,
         nenosiri: nenosiriHashed,
         role: existingUsers === 0 ? "ADMIN" : "USER",
+        subscriptionStatus: "TRIAL",
+        subscriptionEndsAt: trialEndsAt,
       },
     });
   } catch {

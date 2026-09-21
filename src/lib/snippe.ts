@@ -93,6 +93,47 @@ export async function createSnippePayment(input: {
   return parseResponse<SnippePayment>(response);
 }
 
+export async function createSnippeSubscriptionPayment(input: {
+  subscriptionPaymentId: number;
+  userId: number;
+  months: number;
+  amount: number;
+  phone: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}): Promise<SnippePayment> {
+  const callback = webhookUrl();
+  const response = await fetch(`${SNIPPE_BASE_URL}/v1/payments`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey()}`,
+      "Content-Type": "application/json",
+      "Idempotency-Key": `sub-${input.subscriptionPaymentId}`,
+    },
+    body: JSON.stringify({
+      payment_type: "mobile",
+      details: { amount: input.amount, currency: "TZS" },
+      phone_number: input.phone,
+      customer: {
+        firstname: input.firstName,
+        lastname: input.lastName,
+        email: input.email,
+      },
+      ...(callback ? { webhook_url: callback } : {}),
+      metadata: {
+        order_id: `SUB-${input.subscriptionPaymentId}`,
+        subscription_payment_id: String(input.subscriptionPaymentId),
+        user_id: String(input.userId),
+        months: String(input.months),
+      },
+    }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    cache: "no-store",
+  });
+  return parseResponse<SnippePayment>(response);
+}
+
 export async function getSnippePayment(reference: string): Promise<SnippePayment> {
   const response = await fetch(`${SNIPPE_BASE_URL}/v1/payments/${encodeURIComponent(reference)}`, {
     headers: { Authorization: `Bearer ${apiKey()}` },

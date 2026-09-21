@@ -62,25 +62,71 @@ enum SmsTransactionType {
   ADJUSTMENT
 }
 
+enum BusinessRole {
+  OWNER
+  MANAGER
+  CASHIER
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  FAILED
+}
+
+enum SalePaymentMethod {
+  CASH
+  MOBILE_MONEY
+  BANK
+  CREDIT
+}
+
+enum StockMovementType {
+  OPENING
+  PURCHASE
+  SALE
+  CARGO
+  ADJUSTMENT
+}
+
 model User {
-  id            Int      @id @default(autoincrement())
-  jina          String   @unique @db.VarChar(100)
-  nenosiri      String   @db.VarChar(255)
-  jina_duka     String   @db.VarChar(150)
-  simu          String?  @db.VarChar(20)
-  role          UserRole @default(USER)
-  smsEnabled    Boolean  @default(false)
-  smsBalance    Int      @default(0)
-  tareheKuundwa DateTime @default(now())
+  id                 Int                @id @default(autoincrement())
+  jina               String             @unique @db.VarChar(100)
+  nenosiri           String             @db.VarChar(255)
+  jina_duka          String             @db.VarChar(150)
+  simu               String?            @db.VarChar(20)
+  role               UserRole           @default(USER)
+  smsEnabled         Boolean            @default(false)
+  smsBalance         Int                @default(0)
+  ownerId            Int?
+  businessRole       BusinessRole       @default(OWNER)
+  isActive           Boolean            @default(true)
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  subscriptionEndsAt DateTime?
+  tareheKuundwa      DateTime           @default(now())
 
-  customers       Customer[]
-  debts           Debt[]
-  cargos          Cargo[]
-  companyCards    CompanyCard[]
-  smsLogs         SmsLog[]
-  smsPurchases    SmsPurchase[]
-  smsTransactions SmsTransaction[]
+  owner                User?                 @relation("BusinessStaff", fields: [ownerId], references: [id], onDelete: Cascade)
+  staff                User[]                @relation("BusinessStaff")
+  customers            Customer[]
+  debts                Debt[]
+  cargos               Cargo[]
+  companyCards         CompanyCard[]
+  smsLogs              SmsLog[]
+  smsPurchases         SmsPurchase[]
+  smsTransactions      SmsTransaction[]
+  products             Product[]             @relation("BusinessProducts")
+  sales                Sale[]                @relation("BusinessSales")
+  servedSales          Sale[]                @relation("SaleActor")
+  expenses             Expense[]             @relation("BusinessExpenses")
+  stockMovements       StockMovement[]       @relation("BusinessMovements")
+  subscriptionPayments SubscriptionPayment[]
+  auditLogs            AuditLog[]            @relation("BusinessAudits")
+  performedAudits      AuditLog[]            @relation("AuditActor")
 
+  @@index([ownerId])
   @@map("watumiaji")
 }
 
@@ -95,6 +141,7 @@ model Customer {
 
   user  User?  @relation(fields: [mtumiajiId], references: [id], onDelete: Cascade)
   debts Debt[]
+  sales Sale[]
 
   @@index([mtumiajiId])
   @@map("wateja")
@@ -225,19 +272,167 @@ model Cargo {
 }
 
 model CargoItem {
-  id            Int     @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   mzigoId       Int
-  jinaBidhaa    String  @db.VarChar(150)
+  jinaBidhaa    String    @db.VarChar(150)
   idadi         Int
-  kitengo       String  @default("pc") @db.VarChar(50)
-  beiKwaKipande Decimal @db.Decimal(10, 2)
-  jumla         Decimal @db.Decimal(12, 2)
-  imefika       Boolean @default(false)
+  kitengo       String    @default("pc") @db.VarChar(50)
+  beiKwaKipande Decimal   @db.Decimal(10, 2)
+  jumla         Decimal   @db.Decimal(12, 2)
+  imefika       Boolean   @default(false)
+  productId     Int?
+  landedCost    Decimal?  @db.Decimal(12, 2)
+  stockedAt     DateTime?
 
-  cargo Cargo @relation(fields: [mzigoId], references: [id], onDelete: Cascade)
+  cargo   Cargo    @relation(fields: [mzigoId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([mzigoId])
+  @@index([productId])
   @@map("mizigo_bidhaa")
+}
+
+model Product {
+  id                 Int      @id @default(autoincrement())
+  mtumiajiId         Int
+  jina               String   @db.VarChar(150)
+  sku                String   @db.VarChar(60)
+  kitengo            String   @default("pc") @db.VarChar(30)
+  beiKununua         Decimal  @default(0) @db.Decimal(12, 2)
+  beiKuuza           Decimal  @default(0) @db.Decimal(12, 2)
+  stock              Int      @default(0)
+  stockTahadhari     Int      @default(5)
+  active             Boolean  @default(true)
+  tareheKuundwa      DateTime @default(now())
+  tareheKubadilishwa DateTime @updatedAt
+
+  user       User            @relation("BusinessProducts", fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  saleItems  SaleItem[]
+  movements  StockMovement[]
+  cargoItems CargoItem[]
+
+  @@unique([mtumiajiId, sku])
+  @@index([mtumiajiId])
+  @@index([jina])
+  @@map("bidhaa")
+}
+
+model StockMovement {
+  id         Int               @id @default(autoincrement())
+  mtumiajiId Int
+  productId  Int
+  aina       StockMovementType
+  idadi      Int
+  stockBaada Int
+  kumbukumbu String?           @db.VarChar(100)
+  maelezo    String?           @db.VarChar(255)
+  tarehe     DateTime          @default(now())
+
+  user    User    @relation("BusinessMovements", fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([mtumiajiId])
+  @@index([productId])
+  @@index([tarehe])
+  @@map("stock_miamala")
+}
+
+model Sale {
+  id                Int               @id @default(autoincrement())
+  mtumiajiId        Int
+  customerId        Int?
+  servedById        Int?
+  receiptNumber     String            @unique @db.VarChar(40)
+  njiaMalipo        SalePaymentMethod
+  jumla             Decimal           @db.Decimal(12, 2)
+  gharama           Decimal           @default(0) @db.Decimal(12, 2)
+  faida             Decimal           @default(0) @db.Decimal(12, 2)
+  kiasiKilicholipwa Decimal           @default(0) @db.Decimal(12, 2)
+  maelezo           String?           @db.Text
+  tarehe            DateTime          @default(now())
+
+  user     User       @relation("BusinessSales", fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  servedBy User?      @relation("SaleActor", fields: [servedById], references: [id], onDelete: SetNull)
+  items    SaleItem[]
+
+  @@index([mtumiajiId])
+  @@index([customerId])
+  @@index([tarehe])
+  @@map("mauzo")
+}
+
+model SaleItem {
+  id         Int     @id @default(autoincrement())
+  saleId     Int
+  productId  Int?
+  jinaBidhaa String  @db.VarChar(150)
+  idadi      Int
+  beiKununua Decimal @db.Decimal(12, 2)
+  beiKuuza   Decimal @db.Decimal(12, 2)
+  jumla      Decimal @db.Decimal(12, 2)
+
+  sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([saleId])
+  @@index([productId])
+  @@map("mauzo_bidhaa")
+}
+
+model Expense {
+  id         Int      @id @default(autoincrement())
+  mtumiajiId Int
+  aina       String   @db.VarChar(60)
+  kiasi      Decimal  @db.Decimal(12, 2)
+  maelezo    String?  @db.Text
+  tarehe     DateTime @default(now())
+
+  user User @relation("BusinessExpenses", fields: [mtumiajiId], references: [id], onDelete: Cascade)
+
+  @@index([mtumiajiId])
+  @@index([tarehe])
+  @@map("matumizi")
+}
+
+model SubscriptionPayment {
+  id               Int                @id @default(autoincrement())
+  mtumiajiId       Int
+  kiasi            Int                @default(15000)
+  miezi            Int                @default(1)
+  status           SubscriptionStatus @default(PENDING)
+  paymentProvider  String             @default("SNIPPE") @db.VarChar(30)
+  paymentReference String?            @unique @db.VarChar(120)
+  paymentPhone     String?            @db.VarChar(20)
+  paymentStatus    String?            @db.VarChar(30)
+  paymentResponse  String?            @db.Text
+  paymentExpiresAt DateTime?
+  tareheKuundwa    DateTime           @default(now())
+  tareheKulipwa    DateTime?
+
+  user User @relation(fields: [mtumiajiId], references: [id], onDelete: Cascade)
+
+  @@index([mtumiajiId])
+  @@index([status])
+  @@map("subscription_malipo")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  mtumiajiId  Int
+  actorUserId Int?
+  action      String   @db.VarChar(80)
+  entity      String   @db.VarChar(80)
+  entityId    String?  @db.VarChar(80)
+  details     String?  @db.Text
+  tarehe      DateTime @default(now())
+
+  user  User  @relation("BusinessAudits", fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([mtumiajiId])
+  @@index([tarehe])
+  @@map("audit_logs")
 }
 
 model CompanyCard {

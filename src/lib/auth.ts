@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import type { User } from "@prisma/client";
+import type { BusinessRole, User } from "@prisma/client";
 
 const SESSION_COOKIE = "rexabook_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -71,7 +71,15 @@ export async function destroySession(): Promise<void> {
 export async function getCurrentUser(): Promise<User | null> {
   const userId = await getSessionUserId();
   if (!userId) return null;
-  return prisma.user.findUnique({ where: { id: userId } });
+  return prisma.user.findFirst({ where: { id: userId, isActive: true } });
+}
+
+export function businessIdFor(user: Pick<User, "id" | "ownerId">): number {
+  return user.ownerId ?? user.id;
+}
+
+export async function getBusinessOwner(user: Pick<User, "id" | "ownerId">): Promise<User | null> {
+  return prisma.user.findUnique({ where: { id: businessIdFor(user) } });
 }
 
 /** Throws a redirect to /login when the caller is not authenticated. */
@@ -89,5 +97,29 @@ export async function requireAdmin(): Promise<User> {
   if (user.role !== "ADMIN") {
     redirect("/dashboard");
   }
+  return user;
+}
+
+export async function requireBusinessRole(allowed: BusinessRole[]): Promise<User> {
+  const user = await requireUser();
+  if (!allowed.includes(user.businessRole)) redirect("/dashboard");
+  return user;
+}
+
+export function subscriptionIsActive(owner: Pick<User, "subscriptionStatus" | "subscriptionEndsAt">): boolean {
+  if (owner.subscriptionStatus !== "ACTIVE" && owner.subscriptionStatus !== "TRIAL") return false;
+  return Boolean(owner.subscriptionEndsAt && owner.subscriptionEndsAt.getTime() > Date.now());
+}
+
+export async function requireActiveBusinessUser(): Promise<User> {
+  const user = await requireUser();
+  const owner = await getBusinessOwner(user);
+  if (!owner || !subscriptionIsActive(owner)) redirect("/business?subscription=1");
+  return user;
+}
+
+export async function requireActiveBusinessRole(allowed: BusinessRole[]): Promise<User> {
+  const user = await requireActiveBusinessUser();
+  if (!allowed.includes(user.businessRole)) redirect("/dashboard");
   return user;
 }
