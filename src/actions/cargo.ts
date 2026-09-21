@@ -2,12 +2,13 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { businessIdFor, requireActiveBusinessRole } from "@/lib/auth";
 import { cargoCreateSchema, cargoHaliSchema } from "@/lib/validation";
 import { parseZod, fail, type ActionResult } from "@/lib/action-result";
 import { parseDateInput } from "@/lib/format";
 import { imageToDataUri } from "@/lib/uploads";
 import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
+import { writeAudit } from "@/lib/audit";
 
 export interface CargoItemInput {
   jina_bidhaa: string;
@@ -28,7 +29,8 @@ export interface CargoCreateInput {
 
 /** Replicates mzigo_add.php – creates a cargo order with its items. */
 export async function createCargoAction(input: CargoCreateInput): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const businessId = businessIdFor(user);
 
   const parsed = parseZod(cargoCreateSchema, input);
   if (!parsed.success) return { success: false, message: parsed.message, fieldErrors: parsed.fieldErrors };
@@ -42,9 +44,9 @@ export async function createCargoAction(input: CargoCreateInput): Promise<Action
   const jumlaGharama = data.bidhaa.reduce((sum, b) => sum + b.idadi * b.bei_kwa_kipande, 0);
 
   try {
-    await prisma.cargo.create({
+    const cargo = await prisma.cargo.create({
       data: {
-        mtumiajiId: user.id,
+        mtumiajiId: businessId,
         jinaKampuni: data.jina_kampuni,
         jumlaGharama,
         ainaUsafiri: data.aina_usafiri || null,
@@ -63,6 +65,7 @@ export async function createCargoAction(input: CargoCreateInput): Promise<Action
         },
       },
     });
+    await writeAudit({ businessId, actorUserId: user.id, action: "CARGO_CREATED", entity: "Cargo", entityId: cargo.id, details: { supplier: data.jina_kampuni, total: jumlaGharama, items: data.bidhaa.length } });
   } catch {
     return fail("Imeshindikana kuongeza mzigo. Jaribu tena.");
   }
@@ -78,7 +81,8 @@ export async function updateCargoHaliAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const businessId = businessIdFor(user);
 
   const parsed = parseZod(cargoHaliSchema, {
     id: formData.get("id"),
@@ -91,7 +95,7 @@ export async function updateCargoHaliAction(
   const { id, hali, tarehe_kufika, maelezo_fika } = parsed.data!;
 
   const cargo = await prisma.cargo.findFirst({
-    where: { id, mtumiajiId: user.id },
+    where: { id, mtumiajiId: businessId },
   });
   if (!cargo) return fail("Mzigo haupatikani.");
 
@@ -113,6 +117,7 @@ export async function updateCargoHaliAction(
       data: { hali: "Haijafika", tareheKufikaHalisi: null },
     });
   }
+  await writeAudit({ businessId, actorUserId: user.id, action: "CARGO_STATUS_UPDATED", entity: "Cargo", entityId: id, details: { status: hali } });
 
   revalidatePath("/cargo");
   revalidatePath("/dashboard");
@@ -125,7 +130,8 @@ export async function uploadRisitiAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const businessId = businessIdFor(user);
 
   const mzigoId = Number(formData.get("mzigo_id"));
   const file = formData.get("risiti") as File | null;
@@ -135,7 +141,7 @@ export async function uploadRisitiAction(
   }
 
   const cargo = await prisma.cargo.findFirst({
-    where: { id: mzigoId, mtumiajiId: user.id },
+    where: { id: mzigoId, mtumiajiId: businessId },
   });
   if (!cargo) return fail("Mzigo haupatikani.");
 
@@ -150,6 +156,7 @@ export async function uploadRisitiAction(
     where: { id: mzigoId },
     data: { risitiPicha: dataUri },
   });
+  await writeAudit({ businessId, actorUserId: user.id, action: "CARGO_RECEIPT_UPLOADED", entity: "Cargo", entityId: mzigoId });
 
   revalidatePath("/cargo");
   return { success: true, message: "Risiti imepakiwa." };
@@ -157,10 +164,11 @@ export async function uploadRisitiAction(
 
 /** Marks a single cargo item (row) as arrived; the whole cargo becomes "Imefika" once every item has arrived. */
 export async function markCargoItemArrivedAction(cargoItemId: number): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const businessId = businessIdFor(user);
 
   const item = await prisma.cargoItem.findFirst({
-    where: { id: cargoItemId, cargo: { mtumiajiId: user.id } },
+    where: { id: cargoItemId, cargo: { mtumiajiId: businessId } },
     include: { cargo: { include: { items: true } } },
   });
   if (!item) return fail("Bidhaa haipatikani.");
@@ -177,6 +185,7 @@ export async function markCargoItemArrivedAction(cargoItemId: number): Promise<A
       data: { hali: "Imefika", tareheKufikaHalisi: item.cargo.tareheKufikaHalisi ?? new Date() },
     });
   }
+  await writeAudit({ businessId, actorUserId: user.id, action: "CARGO_ITEM_ARRIVED", entity: "CargoItem", entityId: cargoItemId, details: { cargoId: item.cargo.id, cargoComplete: zoteZimefika } });
 
   revalidatePath("/cargo");
   revalidatePath("/dashboard");
@@ -189,10 +198,11 @@ export async function markCargoItemArrivedAction(cargoItemId: number): Promise<A
 
 /** Replicates mzigo_delete.php – deletes a cargo order (and its items). */
 export async function deleteCargoAction(cargoId: number): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const businessId = businessIdFor(user);
 
   const cargo = await prisma.cargo.findFirst({
-    where: { id: cargoId, mtumiajiId: user.id },
+    where: { id: cargoId, mtumiajiId: businessId },
   });
   if (!cargo) return fail("Mzigo haupatikani.");
 
@@ -200,6 +210,7 @@ export async function deleteCargoAction(cargoId: number): Promise<ActionResult> 
     prisma.cargoItem.deleteMany({ where: { mzigoId: cargoId } }),
     prisma.cargo.delete({ where: { id: cargoId } }),
   ]);
+  await writeAudit({ businessId, actorUserId: user.id, action: "CARGO_DELETED", entity: "Cargo", entityId: cargoId, details: { supplier: cargo.jinaKampuni } });
 
   revalidatePath("/cargo");
   revalidatePath("/dashboard");

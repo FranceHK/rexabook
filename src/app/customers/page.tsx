@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { businessIdFor, requireActiveBusinessUser } from "@/lib/auth";
 import { toMoney, bakaa as bakaaOf } from "@/lib/format";
 import { AppShell } from "@/components/layout/app-shell";
 import { CustomersView, type CustomerCardData } from "@/components/customers/customers-view";
@@ -12,11 +12,12 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<{ new?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireActiveBusinessUser();
+  const businessId = businessIdFor(user);
   const params = await searchParams;
 
   const customers = await prisma.customer.findMany({
-    where: { mtumiajiId: user.id },
+    where: { mtumiajiId: businessId },
     include: { debts: true },
     orderBy: { jina: "asc" },
   });
@@ -45,7 +46,7 @@ export default async function CustomersPage({
   });
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
+    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN", businessRole: user.businessRole }}>
       <CustomersView customers={data} clientNewOpen={params.new === "1"} />
     </AppShell>
   );

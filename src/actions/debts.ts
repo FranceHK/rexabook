@@ -2,12 +2,13 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { businessIdFor, getBusinessOwner, requireActiveBusinessUser } from "@/lib/auth";
 import { debtCreateSchema, paymentSchema } from "@/lib/validation";
 import { formDataToObject, parseZod, fail, type ActionResult } from "@/lib/action-result";
 import { toMoney, parseDateInput, bakaa as bakaaOf } from "@/lib/format";
 import { buildDeniSMS, buildMalipoSMS, tumaSMS } from "@/lib/sms";
 import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
+import { writeAudit } from "@/lib/audit";
 
 async function ensureOwnedDebt(userId: number, deniId: number) {
   return prisma.debt.findFirst({
@@ -21,7 +22,9 @@ export async function createDebtAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireActiveBusinessUser();
+  const businessId = businessIdFor(user);
+  const owner = await getBusinessOwner(user);
 
   const parsed = parseZod(debtCreateSchema, formDataToObject(formData));
   if (!parsed.success) return { success: false, message: parsed.message, fieldErrors: parsed.fieldErrors };
@@ -32,15 +35,15 @@ export async function createDebtAction(
   if (!tareheKukopa) return fail("Tarehe si sahihi.");
 
   const owned = await prisma.customer.findFirst({
-    where: { id: mteja_id, mtumiajiId: user.id },
+    where: { id: mteja_id, mtumiajiId: businessId },
   });
   if (!owned) return fail("Mteja hakupatikana.");
 
   try {
-    await prisma.debt.create({
+    const debt = await prisma.debt.create({
       data: {
         mtejaId: mteja_id,
-        mtumiajiId: user.id,
+        mtumiajiId: businessId,
         jinaBidhaa: jina_bidhaa,
         kiasiAsili: kiasi,
         kiasiKilicholipwa: 0,
@@ -49,6 +52,7 @@ export async function createDebtAction(
         imekamilika: false,
       },
     });
+    await writeAudit({ businessId, actorUserId: user.id, action: "DEBT_CREATED", entity: "Debt", entityId: debt.id, details: { customerId: mteja_id, amount: kiasi, product: jina_bidhaa } });
   } catch {
     return fail("Imeshindikana kuongeza deni. Jaribu tena.");
   }
@@ -56,7 +60,7 @@ export async function createDebtAction(
   // SMS notification for the new debt (best-effort)
   if (owned.simu) {
     const madeni = await prisma.debt.findMany({
-      where: { mtejaId: mteja_id, mtumiajiId: user.id, imekamilika: false },
+      where: { mtejaId: mteja_id, mtumiajiId: businessId, imekamilika: false },
     });
     const jumlaDeni = madeni.reduce((sum, d) => sum + bakaaOf(d.kiasiAsili, d.kiasiKilicholipwa), 0);
 
@@ -66,9 +70,9 @@ export async function createDebtAction(
       kiasi,
       maelezo: maelezo || undefined,
       jumlaDeni,
-      jinaDuka: user.jina_duka ?? "Duka",
+      jinaDuka: owner?.jina_duka ?? "Duka",
     });
-    await tumaSMS(user.id, owned.simu, ujumbe);
+    await tumaSMS(businessId, owned.simu, ujumbe);
   }
 
   revalidatePath("/dashboard");
@@ -79,10 +83,11 @@ export async function createDebtAction(
 
 /** Replicates deni_delete.php – deletes a debt and its payments. */
 export async function deleteDebtAction(deniId: number): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireActiveBusinessUser();
+  const businessId = businessIdFor(user);
 
   const deni = await prisma.debt.findFirst({
-    where: { id: deniId, mtumiajiId: user.id },
+    where: { id: deniId, mtumiajiId: businessId },
   });
   if (!deni) return fail("Deni halipatikani.");
 
@@ -90,6 +95,7 @@ export async function deleteDebtAction(deniId: number): Promise<ActionResult> {
     prisma.payment.deleteMany({ where: { deniId } }),
     prisma.debt.delete({ where: { id: deniId } }),
   ]);
+  await writeAudit({ businessId, actorUserId: user.id, action: "DEBT_DELETED", entity: "Debt", entityId: deniId, details: { customerId: deni.mtejaId } });
 
   revalidatePath("/dashboard");
   revalidateTag(DASHBOARD_CACHE_TAG);
@@ -102,14 +108,15 @@ export async function addPaymentAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireActiveBusinessUser();
+  const businessId = businessIdFor(user);
 
   const parsed = parseZod(paymentSchema, formDataToObject(formData));
   if (!parsed.success) return { success: false, message: parsed.message, fieldErrors: parsed.fieldErrors };
 
   const { deni_id, kiasi, maelezo } = parsed.data!;
 
-  const deni = await ensureOwnedDebt(user.id, deni_id);
+  const deni = await ensureOwnedDebt(businessId, deni_id);
   if (!deni) return fail("Deni halipatikani.");
   if (deni.imekamilika) return fail("Deni hili tayari limelipwa kikamilifu.");
 
@@ -125,7 +132,7 @@ export async function addPaymentAction(
   const imekamilika = kipyaKilicholipwa >= asili - 0.001;
 
   try {
-    await prisma.$transaction([
+    const [payment] = await prisma.$transaction([
       prisma.payment.create({
         data: { deniId: deni_id, kiasi, maelezo: maelezo || null },
       }),
@@ -134,6 +141,7 @@ export async function addPaymentAction(
         data: { kiasiKilicholipwa: kipyaKilicholipwa, imekamilika },
       }),
     ]);
+    await writeAudit({ businessId, actorUserId: user.id, action: "PAYMENT_RECORDED", entity: "Payment", entityId: payment.id, details: { debtId: deni_id, amount: kiasi, completed: imekamilika } });
   } catch {
     return fail("Imeshindikana kuhifadhi malipo. Jaribu tena.");
   }
@@ -156,7 +164,7 @@ export async function addPaymentAction(
       jumlaMadeniYote,
       jinaDuka: userInfo?.jina_duka ?? "Duka",
     });
-    await tumaSMS(user.id, simuMteja, ujumbe);
+    await tumaSMS(businessId, simuMteja, ujumbe);
   }
 
   const ujumbe = imekamilika ? "Hongera! Deni limelipwa kikamilifu! 🎉" : "Malipo yamepokelewa.";

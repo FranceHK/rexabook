@@ -17,6 +17,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
+  BriefcaseBusiness,
+  CreditCard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -27,6 +29,7 @@ interface AppUser {
   jina: string;
   jinaDuka: string;
   isAdmin?: boolean;
+  businessRole?: "OWNER" | "MANAGER" | "CASHIER";
 }
 
 interface NavItem {
@@ -35,18 +38,21 @@ interface NavItem {
   icon: LucideIcon;
   accent: string;
   adminOnly?: boolean;
+  roles?: Array<"OWNER" | "MANAGER" | "CASHIER">;
 }
 
 const nav: NavItem[] = [
   { href: "/dashboard", label: "Dashibodi", icon: LayoutDashboard, accent: "text-primary" },
+  { href: "/business", label: "Biashara", icon: BriefcaseBusiness, accent: "text-warning" },
   { href: "/customers", label: "Wadaiwa", icon: Users, accent: "text-info" },
-  { href: "/cargo", label: "Mizigo", icon: Package, accent: "text-success" },
-  { href: "/settings", label: "Mipangilio", icon: Settings, accent: "text-warning" },
+  { href: "/cargo", label: "Mizigo", icon: Package, accent: "text-success", roles: ["OWNER", "MANAGER"] },
+  { href: "/settings", label: "Mipangilio", icon: Settings, accent: "text-warning", roles: ["OWNER"] },
   { href: "/admin/sms", label: "Admin SMS", icon: ShieldCheck, accent: "text-danger", adminOnly: true },
+  { href: "/admin/subscriptions", label: "Admin Malipo", icon: CreditCard, accent: "text-success", adminOnly: true },
 ];
 
 // Bottom nav on phones/tablets: keep it to the 3 main screens.
-const mobileNav = nav.filter((n) => n.href !== "/settings" && !n.adminOnly);
+const mobileNav = nav.filter((n) => n.href !== "/settings" && n.href !== "/cargo" && !n.adminOnly);
 
 function initialsOf(jina: string): string {
   return jina
@@ -62,15 +68,17 @@ function NavLinks({
   onNavigate,
   collapsed = false,
   isAdmin = false,
+  businessRole = "OWNER",
 }: {
   pathname: string;
   onNavigate?: () => void;
   collapsed?: boolean;
   isAdmin?: boolean;
+  businessRole?: "OWNER" | "MANAGER" | "CASHIER";
 }) {
   return (
     <nav className="flex flex-col gap-1.5">
-      {nav.filter((item) => !item.adminOnly || isAdmin).map(({ href, label, icon: Icon, accent }) => {
+      {nav.filter((item) => (!item.adminOnly || isAdmin) && (!item.roles || item.roles.includes(businessRole))).map(({ href, label, icon: Icon, accent }) => {
         const active = pathname === href || pathname.startsWith(href + "/");
         return (
           <Link
@@ -188,7 +196,7 @@ function SidebarBody({
         <div className={cn("mb-2 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3", collapsed && "sr-only")}>
           Menyu Kuu
         </div>
-        <NavLinks pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} isAdmin={user.isAdmin} />
+        <NavLinks pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} isAdmin={user.isAdmin} businessRole={user.businessRole} />
       </div>
 
       <div className="border-t border-line px-3 py-4">
@@ -322,7 +330,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       {/* Mobile bottom navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(17,24,39,0.08)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto flex max-w-md items-stretch px-2">
-          {mobileNav.map(({ href, label, icon: Icon }) => {
+          {mobileNav.filter((item) => !item.roles || item.roles.includes(user.businessRole ?? "OWNER")).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link

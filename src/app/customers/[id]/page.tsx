@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { businessIdFor, getBusinessOwner, requireActiveBusinessUser } from "@/lib/auth";
 import { toMoney, bakaa as bakaaOf } from "@/lib/format";
 import { AppShell } from "@/components/layout/app-shell";
 import { CustomerDetailView, type CustomerDetailData } from "@/components/customers/customer-detail-view";
@@ -15,13 +15,15 @@ export default async function CustomerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireActiveBusinessUser();
+  const businessId = businessIdFor(user);
+  const owner = await getBusinessOwner(user);
   const { id } = await params;
   const customerId = Number(id);
   if (!Number.isFinite(customerId) || customerId <= 0) notFound();
 
   const customer = await prisma.customer.findFirst({
-    where: { id: customerId, mtumiajiId: user.id },
+    where: { id: customerId, mtumiajiId: businessId },
     include: {
       debts: {
         orderBy: { tareheKukopa: "desc" },
@@ -68,7 +70,7 @@ export default async function CustomerDetailPage({
 
   const smsLog = customer.simu
     ? await prisma.smsLog.findMany({
-        where: { namba: customer.simu, mtumiajiId: user.id },
+        where: { namba: customer.simu, mtumiajiId: businessId },
         orderBy: { tarehe: "desc" },
         take: 12,
       })
@@ -90,7 +92,7 @@ export default async function CustomerDetailPage({
     reminderMessage: activeDebts.length > 0
       ? buildKumbushoSMS({
           jinaMteja: customer.jina,
-          jinaDuka: user.jina_duka ?? "Duka",
+          jinaDuka: owner?.jina_duka ?? "Duka",
           deniLililobaki: totalBakaa,
           yanayoendelea: activeDebts.length,
           bidhaaZilizobaki: activeDebts.map((d) => d.jinaBidhaa?.trim() || "Deni"),
@@ -105,7 +107,7 @@ export default async function CustomerDetailPage({
   };
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
+    <AppShell user={{ jina: user.jina, jinaDuka: owner?.jina_duka ?? user.jina_duka, isAdmin: user.role === "ADMIN", businessRole: user.businessRole }}>
       <CustomerDetailView data={data} />
     </AppShell>
   );

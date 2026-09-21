@@ -4,16 +4,18 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { hash, compare } from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
-import { requireAdmin, requireUser } from "@/lib/auth";
+import { businessIdFor, requireAdmin, requireBusinessRole, requireUser } from "@/lib/auth";
 import { profileSchema, passwordSchema, companyCardSchema } from "@/lib/validation";
 import { parseZod, fail, type ActionResult } from "@/lib/action-result";
+import { writeAudit } from "@/lib/audit";
 
 /** Replicates the profile portion of profaili_update.php. */
 export async function updateProfileAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireBusinessRole(["OWNER"]);
+  const businessId = businessIdFor(user);
 
   const parsed = parseZod(profileSchema, {
     jina: formData.get("jina"),
@@ -37,6 +39,7 @@ export async function updateProfileAction(
   } catch {
     return fail("Imeshindikana kusasisha taarifa. Jaribu tena.");
   }
+  await writeAudit({ businessId, actorUserId: user.id, action: "PROFILE_UPDATED", entity: "User", entityId: user.id });
 
   revalidatePath("/settings");
   revalidatePath("/dashboard");
@@ -76,6 +79,7 @@ export async function changePasswordAction(
   } catch {
     return fail("Imeshindikana kubadilisha nenosiri. Jaribu tena.");
   }
+  await writeAudit({ businessId: businessIdFor(user), actorUserId: user.id, action: "PASSWORD_CHANGED", entity: "User", entityId: user.id });
 
   return { success: true, message: "Nenosiri limebadilishwa." };
 }
@@ -85,7 +89,8 @@ export async function addCompanyCardAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireBusinessRole(["OWNER"]);
+  const businessId = businessIdFor(user);
 
   const parsed = parseZod(companyCardSchema, {
     jina_kampuni: formData.get("jina_kampuni"),
@@ -97,14 +102,15 @@ export async function addCompanyCardAction(
   const { jina_kampuni, bank, namba_malipo } = parsed.data!;
 
   try {
-    await prisma.companyCard.create({
+    const card = await prisma.companyCard.create({
       data: {
-        mtumiajiId: user.id,
+        mtumiajiId: businessId,
         jinaKampuni: jina_kampuni,
         bank,
         nambaMalipo: namba_malipo,
       },
     });
+    await writeAudit({ businessId, actorUserId: user.id, action: "PAYMENT_CARD_CREATED", entity: "CompanyCard", entityId: card.id, details: { company: jina_kampuni, bank } });
   } catch {
     return fail("Imeshindikana kuhifadhi kadi ya kampuni. Jaribu tena.");
   }
@@ -115,14 +121,16 @@ export async function addCompanyCardAction(
 
 /** Removes a company payment card. */
 export async function deleteCompanyCardAction(cardId: number): Promise<ActionResult> {
-  const user = await requireUser();
+  const user = await requireBusinessRole(["OWNER"]);
+  const businessId = businessIdFor(user);
 
   const card = await prisma.companyCard.findFirst({
-    where: { id: cardId, mtumiajiId: user.id },
+    where: { id: cardId, mtumiajiId: businessId },
   });
   if (!card) return fail("Kadi haipatikani.");
 
   await prisma.companyCard.delete({ where: { id: cardId } });
+  await writeAudit({ businessId, actorUserId: user.id, action: "PAYMENT_CARD_DELETED", entity: "CompanyCard", entityId: cardId, details: { company: card.jinaKampuni } });
 
   revalidatePath("/settings");
   return { success: true, message: "Kadi imefutwa." };

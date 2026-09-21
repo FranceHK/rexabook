@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { businessIdFor, requireActiveBusinessRole } from "@/lib/auth";
 import { toMoney } from "@/lib/format";
 import { AppShell } from "@/components/layout/app-shell";
 import { CargoView, type CargoClient } from "@/components/cargo/cargo-view";
@@ -12,11 +12,12 @@ export default async function CargoPage({
 }: {
   searchParams: Promise<{ new?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const businessId = businessIdFor(user);
   const params = await searchParams;
 
   const cargos = await prisma.cargo.findMany({
-    where: { mtumiajiId: user.id },
+    where: { mtumiajiId: businessId },
     include: { items: true },
     orderBy: { tareheKuagiza: "desc" },
   });
@@ -45,7 +46,7 @@ export default async function CargoPage({
   }));
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
+    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN", businessRole: user.businessRole }}>
       <CargoView cargos={data} clientNewOpen={params.new === "1"} />
     </AppShell>
   );

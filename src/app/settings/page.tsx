@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireBusinessRole } from "@/lib/auth";
 import { AppShell } from "@/components/layout/app-shell";
 import { SettingsView, type CompanyCardClient } from "@/components/settings/settings-view";
 import type { SmsWalletClient } from "@/components/settings/sms-wallet-card";
@@ -8,7 +8,7 @@ import type { SmsWalletClient } from "@/components/settings/sms-wallet-card";
 export const metadata: Metadata = { title: "Mipangilio" };
 
 export default async function SettingsPage() {
-  const user = await requireUser();
+  const user = await requireBusinessRole(["OWNER"]);
 
   const [cards, purchases] = await Promise.all([
     prisma.companyCard.findMany({
@@ -48,7 +48,7 @@ export default async function SettingsPage() {
   };
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
+    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN", businessRole: user.businessRole }}>
       <SettingsView
         user={{
           jina: user.jina,

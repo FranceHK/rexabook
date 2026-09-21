@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/auth";
+import { businessIdFor, requireActiveBusinessUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/dashboard-data";
 import { toMoney, fmtPesa, fmtTarehe, fmtTareheRefu, bakaa as bakaaOf, pctPaid, initial } from "@/lib/format";
 import Link from "next/link";
@@ -36,8 +36,8 @@ export const metadata: Metadata = { title: "Dashibodi" };
 const DELAY = ["0ms", "60ms", "120ms", "180ms"];
 
 export default async function DashboardPage() {
-  const userId = await getSessionUserId();
-  if (!userId) redirect("/login");
+  const sessionUser = await requireActiveBusinessUser();
+  const userId = businessIdFor(sessionUser);
 
   const dashboardData = await getDashboardData(userId);
   if (!dashboardData) redirect("/login");
@@ -103,7 +103,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
+    <AppShell user={{ jina: sessionUser.jina, jinaDuka: user.jina_duka, isAdmin: sessionUser.role === "ADMIN", businessRole: sessionUser.businessRole }}>
       {/* ============ Hero ============ */}
       <section
         className="anim-up relative mb-8 overflow-hidden rounded-2xl p-6 text-white shadow-glass md:p-8"

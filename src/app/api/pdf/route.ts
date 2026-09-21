@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUserId } from "@/lib/auth";
+import { businessIdFor, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { reportParamsSchema } from "@/lib/validation";
 import { generatePdfReport, type PdfDebtRow } from "@/lib/report";
@@ -68,10 +68,11 @@ const REPORT_LABELS: Record<string, string> = {
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const userId = await getSessionUserId();
-  if (!userId) {
+  const user = await getCurrentUser();
+  if (!user) {
     return NextResponse.json({ ujumbe: "Ingia kwanza." }, { status: 401 });
   }
+  const userId = businessIdFor(user);
 
   const params = Object.fromEntries(req.nextUrl.searchParams);
   const parsed = reportParamsSchema.safeParse({

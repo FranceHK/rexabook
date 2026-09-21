@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 
 const SESSION_COOKIE = "rexabook_session";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/customers", "/cargo", "/settings", "/admin"];
+const PROTECTED_PREFIXES = ["/dashboard", "/business", "/customers", "/cargo", "/settings", "/admin"];
 const AUTH_PAGES = ["/login"];
 
 function getSecret(): Uint8Array {
@@ -46,6 +46,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
+    "/business/:path*",
     "/customers/:path*",
     "/cargo/:path*",
     "/settings/:path*",
