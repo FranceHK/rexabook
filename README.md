@@ -1,6 +1,6 @@
 # RexaBook
 
-Modern business management system — a from-scratch migration of the legacy PHP/MySQL **"Duka Madeni"** app into a Next.js 15 (App Router) application backed by PostgreSQL (Neon).
+Modern business management system — a from-scratch migration of the legacy PHP/MySQL **"Duka Madeni"** app into a Next.js 15 (App Router) application backed by PostgreSQL (Neon). The interface starts in light mode.
 
 Everything a small shop needs in one Swahili-first app:
 
@@ -8,13 +8,19 @@ Everything a small shop needs in one Swahili-first app:
 - **Madeni (Debts)** — record credit, track paid amounts, payment history
 - **Malipo (Payments)** — record partial payments with optional Meseji SMS notifications
 - **Mizigo (Cargo tracking)** — shipments with multiple items, receipt photo uploads
+- **Biashara** — products, stock movements, sales, expenses and monthly profit
+- **Cargo to stock** — landed-cost allocation when arrived cargo enters inventory
+- **Receipts & sharing** — branded sales PDF receipts and WhatsApp links
+- **Team controls** — owner, manager and cashier access plus an audit trail
+- **Subscription** — TZS 15,000/month or TZS 150,000/year via Snippe mobile money
+- **Backup** — an owner-only JSON export of operational business data
 - **PDF Reports** — per customer: rekodi ya madeni / malipo / muhtasari
 - **Mipangilio (Settings)** — update profile, change password
 
 ## Tech stack
 
 - **Next.js 15** (App Router), React 19, TypeScript (strict)
-- **Tailwind CSS v4** (`@tailwindcss/postcss`) — class-based dark mode, default dark
+- **Tailwind CSS v4** (`@tailwindcss/postcss`) — light mode by default with optional dark mode
 - **Prisma 6** over PostgreSQL (Neon)
 - **Auth** — stateless JWT (jose) in an httpOnly secure cookie, bcryptjs password hashing
 - **PDF** — `pdf-lib`, served by `GET /api/pdf`
@@ -60,6 +66,12 @@ The Prisma schema (`prisma/schema.prisma`) maps model names/camelCase columns to
 | SmsTransaction | sms_miamala | Credit purchase, usage and refunds |
 | Cargo        | mizigo    | enum hali Haijafika/Imefika           |
 | CargoItem    | mizigo_bidhaa | `mzigoId` = parent cargo           |
+| Product      | bidhaa | stock, buy/sell prices and low-stock threshold |
+| StockMovement | stock_miamala | opening, sale, cargo and adjustment history |
+| Sale / SaleItem | mauzo / mauzo_bidhaa | receipts, margins and sold items |
+| Expense      | matumizi | operating expenses used in net-profit reports |
+| SubscriptionPayment | subscription_malipo | Snippe subscription collections |
+| AuditLog     | audit_logs | business-sensitive action history |
 
 Non-default index creation and any future schema changes go through Prisma migrations:
 
@@ -114,8 +126,9 @@ npm run db:migrate-mysql
 
 ## Authentication & authorization
 
-- Cookie `rexabook_session` is a signed JWT; `middleware.ts` protects `/dashboard`, `/customers`, `/cargo`, `/settings`.
+- Cookie `rexabook_session` is a signed JWT; `middleware.ts` protects `/dashboard`, `/business`, `/customers`, `/cargo`, `/settings`.
 - Ownership is enforced at the query level via `mtumiajiId` everywhere (server actions and the PDF route re-check the user).
+- Staff accounts resolve to their owner's business. Managers can run stock, cargo and expense workflows; cashiers can record sales; only owners can manage staff, billing, settings and backups.
 - Client-side state uses server actions + `revalidatePath`; the UI is progressive-enhancement friendly.
 
 ## Notes for developers
