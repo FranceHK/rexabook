@@ -6,7 +6,7 @@ Everything a small shop needs in one Swahili-first app:
 
 - **Wadaiwa (Customers)** — customer cards, overview stats
 - **Madeni (Debts)** — record credit, track paid amounts, payment history
-- **Malipo (Payments)** — record partial payments, optional SMS notifications (Beem Africa)
+- **Malipo (Payments)** — record partial payments with optional Meseji SMS notifications
 - **Mizigo (Cargo tracking)** — shipments with multiple items, receipt photo uploads
 - **PDF Reports** — per customer: rekodi ya madeni / malipo / muhtasari
 - **Mipangilio (Settings)** — update profile, change password
@@ -18,7 +18,7 @@ Everything a small shop needs in one Swahili-first app:
 - **Prisma 6** over PostgreSQL (Neon)
 - **Auth** — stateless JWT (jose) in an httpOnly secure cookie, bcryptjs password hashing
 - **PDF** — `pdf-lib`, served by `GET /api/pdf`
-- **SMS** — Beem Africa API (best-effort, logged to `sms_log`)
+- **SMS** — Meseji delivery, prepaid wallets, direct Snippe mobile-money payments, and admin profit reporting
 
 ## Getting started
 
@@ -38,7 +38,11 @@ Open http://localhost:3000 — the first visitor can register a shop account.
 | `DATABASE_URL`    | yes      | Neon pooled connection string             |
 | `SESSION_SECRET`  | yes      | Cookie signing key (`openssl rand -base64 32`) |
 | `NEXTAUTH_URL`    | no       | Base URL for cookies/redirects            |
-| `MESEJI_API_KEY` + `MESEJI_SENDER` | no | SMS gateway via Meseji (skip → no outbound SMS) |
+| `MESEJI_API_KEY` or `MESEJI_TOKEN` | no | Meseji authentication (`x-api-key` or Bearer token) |
+| `MESEJI_SENDER` | no | Approved Meseji sender ID (default `MESEJI`) |
+| `SNIPPE_API_KEY` | no | Server-side Snippe key for direct mobile-money collections |
+| `SNIPPE_WEBHOOK_SECRET` | no | Secret used to verify signed Snippe webhooks |
+| `SNIPPE_WEBHOOK_URL` | production | Public HTTPS callback; defaults to `NEXTAUTH_URL/api/webhooks/snippe` |
 | `MYSQL_*`         | only migration | Legacy MySQL source connection       |
 
 ## Database
@@ -52,6 +56,8 @@ The Prisma schema (`prisma/schema.prisma`) maps model names/camelCase columns to
 | Debt         | madeni    | `tareheKukopa` = DATE                |
 | Payment      | malipo    | decimal `kiasi`, cascade on debt      |
 | SmsLog       | sms_log   | enum status success/failed/pending    |
+| SmsPurchase  | sms_manunuzi | SMS credit purchase requests        |
+| SmsTransaction | sms_miamala | Credit purchase, usage and refunds |
 | Cargo        | mizigo    | enum hali Haijafika/Imefika           |
 | CargoItem    | mizigo_bidhaa | `mzigoId` = parent cargo           |
 
@@ -121,5 +127,6 @@ npm run build       # next build
 ```
 
 - The three lint warnings about `<img>` are intentional: receipt photos are base64 data URIs, so `next/image` optimization does not apply.
-- Beem SMS is best-effort: failures are logged to `sms_log` and never block a payment being recorded.
+- Meseji SMS is best-effort: failures are logged and never block debt/payment records. Reserved SMS credits are refunded when delivery fails.
+- Snippe payments use signed, idempotent webhooks. The minimum purchase is 25 SMS (TZS 500), and credits are added only after Snippe reports a completed payment.
 - PDF generation runs on a server route (`GET /api/pdf`); include `mteja_id`, `report_type` (`madeni`|`malipo`|`muhtasari`), optional `start_date`/`end_date` and `include_payments=1`.

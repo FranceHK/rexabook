@@ -45,7 +45,7 @@ export default async function CustomersPage({
   });
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka }}>
+    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
       <CustomersView customers={data} clientNewOpen={params.new === "1"} />
     </AppShell>
   );

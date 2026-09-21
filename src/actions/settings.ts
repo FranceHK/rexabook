@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { hash, compare } from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
-import { requireUser } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import { profileSchema, passwordSchema, companyCardSchema } from "@/lib/validation";
 import { parseZod, fail, type ActionResult } from "@/lib/action-result";
 
@@ -130,11 +130,12 @@ export async function deleteCompanyCardAction(cardId: number): Promise<ActionRes
 
 /** Deletes a registered user account and all of its data (customers, debts, cargo, SMS). */
 export async function deleteUserAction(userId: number): Promise<ActionResult> {
-  const me = await requireUser();
+  const me = await requireAdmin();
   if (userId === me.id) return fail("Huwezi kufuta akaunti yako mwenyewe.");
 
   const target = await prisma.user.findUnique({ where: { id: userId } });
   if (!target) return fail("Mtumiaji hapatikani. Inawezekana ameshafutwa.");
+  if (target.role === "ADMIN") return fail("Akaunti nyingine ya admin haiwezi kufutwa hapa.");
 
   try {
     await prisma.user.delete({ where: { id: userId } });

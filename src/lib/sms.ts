@@ -1,4 +1,9 @@
 import { prisma } from "@/lib/db";
+import {
+  SMS_PROVIDER_COST,
+  SMS_SELLING_PRICE,
+  countSmsUnits,
+} from "@/lib/sms-pricing";
 
 const MESEJI_URL = "https://meseji.co.tz/api/v1/sms/send";
 
@@ -111,31 +116,109 @@ export function normalizePhone(namba: string): string {
   return `255${n}`;
 }
 
-/** Inserts an SMS log row (used for records). */
-export async function logSMS(namba: string, ujumbe: string, status: "success" | "failed" | "pending", response?: string) {
+/** Inserts a tenant-owned SMS log row for usage and delivery records. */
+export async function logSMS(
+  userId: number,
+  namba: string,
+  ujumbe: string,
+  status: "success" | "failed" | "pending",
+  response?: string,
+  units = countSmsUnits(ujumbe)
+) {
   try {
-    await prisma.smsLog.create({
+    return await prisma.smsLog.create({
       data: {
+        mtumiajiId: userId,
         namba,
         ujumbe,
         status,
+        vipande: units,
+        beiMteja: status === "success" ? units * SMS_SELLING_PRICE : 0,
+        gharamaMtoa: status === "success" ? units * SMS_PROVIDER_COST : 0,
+        faida: status === "success" ? units * (SMS_SELLING_PRICE - SMS_PROVIDER_COST) : 0,
         response: response ? String(response).slice(0, 2000) : null,
       },
     });
   } catch {
     // logging must never break the payment flow
+    return null;
   }
+}
+
+async function reserveSmsUnits(userId: number, units: number): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const reserved = await tx.user.updateMany({
+      where: { id: userId, smsEnabled: true, smsBalance: { gte: units } },
+      data: { smsBalance: { decrement: units } },
+    });
+    if (reserved.count !== 1) return false;
+
+    const account = await tx.user.findUnique({
+      where: { id: userId },
+      select: { smsBalance: true },
+    });
+    await tx.smsTransaction.create({
+      data: {
+        mtumiajiId: userId,
+        aina: "USAGE",
+        vipande: -units,
+        salioBaada: account?.smsBalance ?? 0,
+        maelezo: `SMS ${units} imetengwa kwa kutumwa`,
+      },
+    });
+    return true;
+  });
+}
+
+async function refundSmsUnits(userId: number, units: number, reason: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const account = await tx.user.update({
+      where: { id: userId },
+      data: { smsBalance: { increment: units } },
+      select: { smsBalance: true },
+    });
+    await tx.smsTransaction.create({
+      data: {
+        mtumiajiId: userId,
+        aina: "REFUND",
+        vipande: units,
+        salioBaada: account.smsBalance,
+        maelezo: reason.slice(0, 255),
+      },
+    });
+  });
 }
 
 /**
  * Sends an SMS using the Meseji API. Returns false (without throwing)
  * when SMS is disabled or fails, matching the original `@tumaSMS` behaviour.
  */
-export async function tumaSMS(namba: string, ujumbe: string): Promise<boolean> {
+export async function tumaSMS(userId: number, namba: string, ujumbe: string): Promise<boolean> {
   const apiKey = process.env.MESEJI_API_KEY;
+  const bearerToken = process.env.MESEJI_TOKEN;
+  const units = countSmsUnits(ujumbe);
 
-  if (!apiKey) {
-    await logSMS(namba, ujumbe, "pending");
+  if (!apiKey && !bearerToken) {
+    await logSMS(userId, namba, ujumbe, "pending", "Huduma ya Meseji haijawekewa credentials.", units);
+    return false;
+  }
+
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { smsEnabled: true, smsBalance: true },
+  });
+  if (!account?.smsEnabled) {
+    await logSMS(userId, namba, ujumbe, "failed", "SMS zimezimwa kwenye akaunti.", units);
+    return false;
+  }
+  if (account.smsBalance < units) {
+    await logSMS(userId, namba, ujumbe, "failed", "Salio la SMS halitoshi.", units);
+    return false;
+  }
+
+  const reserved = await reserveSmsUnits(userId, units);
+  if (!reserved) {
+    await logSMS(userId, namba, ujumbe, "failed", "Salio halitoshi au SMS zimezimwa.", units);
     return false;
   }
 
@@ -147,7 +230,8 @@ export async function tumaSMS(namba: string, ujumbe: string): Promise<boolean> {
 
   const headers = new Headers();
   headers.set("Content-Type", "application/json");
-  headers.set("x-api-key", apiKey);
+  if (apiKey) headers.set("x-api-key", apiKey);
+  if (bearerToken) headers.set("Authorization", `Bearer ${bearerToken}`);
 
   try {
     const res = await fetch(MESEJI_URL, {
@@ -157,11 +241,24 @@ export async function tumaSMS(namba: string, ujumbe: string): Promise<boolean> {
       signal: AbortSignal.timeout(30000),
     });
     const body = await res.text();
-    const success = res.status === 200;
-    await logSMS(namba, ujumbe, success ? "success" : "failed", body);
+    const success = res.ok;
+    await logSMS(userId, namba, ujumbe, success ? "success" : "failed", body, units);
+    if (!success) {
+      try {
+        await refundSmsUnits(userId, units, `SMS haikutumwa na Meseji (${res.status}).`);
+      } catch {
+        // The delivery failure remains logged even if a database refund retry is needed.
+      }
+    }
     return success;
   } catch (err) {
-    await logSMS(namba, ujumbe, "failed", err instanceof Error ? err.message : String(err));
+    const reason = err instanceof Error ? err.message : String(err);
+    await logSMS(userId, namba, ujumbe, "failed", reason, units);
+    try {
+      await refundSmsUnits(userId, units, "SMS imeshindwa kutumwa; salio limerudishwa.");
+    } catch {
+      // Keep SMS best-effort; the failed delivery is already recorded above.
+    }
     return false;
   }
 }

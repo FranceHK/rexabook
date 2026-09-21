@@ -16,7 +16,9 @@ import {
   Store,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/components/theme/theme-provider";
 import { BrandLogo } from "@/components/brand-logo";
@@ -24,17 +26,27 @@ import { BrandLogo } from "@/components/brand-logo";
 interface AppUser {
   jina: string;
   jinaDuka: string;
+  isAdmin?: boolean;
 }
 
-const nav = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  accent: string;
+  adminOnly?: boolean;
+}
+
+const nav: NavItem[] = [
   { href: "/dashboard", label: "Dashibodi", icon: LayoutDashboard, accent: "text-primary" },
   { href: "/customers", label: "Wadaiwa", icon: Users, accent: "text-info" },
   { href: "/cargo", label: "Mizigo", icon: Package, accent: "text-success" },
   { href: "/settings", label: "Mipangilio", icon: Settings, accent: "text-warning" },
+  { href: "/admin/sms", label: "Admin SMS", icon: ShieldCheck, accent: "text-danger", adminOnly: true },
 ];
 
 // Bottom nav on phones/tablets: keep it to the 3 main screens.
-const mobileNav = nav.filter((n) => n.href !== "/settings");
+const mobileNav = nav.filter((n) => n.href !== "/settings" && !n.adminOnly);
 
 function initialsOf(jina: string): string {
   return jina
@@ -49,14 +61,16 @@ function NavLinks({
   pathname,
   onNavigate,
   collapsed = false,
+  isAdmin = false,
 }: {
   pathname: string;
   onNavigate?: () => void;
   collapsed?: boolean;
+  isAdmin?: boolean;
 }) {
   return (
     <nav className="flex flex-col gap-1.5">
-      {nav.map(({ href, label, icon: Icon, accent }) => {
+      {nav.filter((item) => !item.adminOnly || isAdmin).map(({ href, label, icon: Icon, accent }) => {
         const active = pathname === href || pathname.startsWith(href + "/");
         return (
           <Link
@@ -174,7 +188,7 @@ function SidebarBody({
         <div className={cn("mb-2 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3", collapsed && "sr-only")}>
           Menyu Kuu
         </div>
-        <NavLinks pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} />
+        <NavLinks pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} isAdmin={user.isAdmin} />
       </div>
 
       <div className="border-t border-line px-3 py-4">
@@ -184,7 +198,7 @@ function SidebarBody({
           </span>
           <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
             <p className="truncate text-sm font-medium text-ink">{user.jina}</p>
-            <p className="truncate text-xs text-ink-3">Msimamizi</p>
+            <p className="truncate text-xs text-ink-3">{user.isAdmin ? "Admin" : "Mtumiaji"}</p>
           </div>
         </div>
         <LogoutBtn onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} collapsed={collapsed} />
@@ -224,7 +238,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
     }
   }
 
-  const currentLabel = nav.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"))?.label ?? "RexaBook";
+  const currentLabel = nav.find((n) => (!n.adminOnly || user.isAdmin) && (pathname === n.href || pathname.startsWith(n.href + "/")))?.label ?? "RexaBook";
 
   return (
     <div className="min-h-screen">

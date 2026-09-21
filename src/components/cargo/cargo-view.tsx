@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Plus,
@@ -323,7 +324,7 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
                       className="mb-3 flex w-full items-center gap-2 rounded-xl bg-success/8 px-3 py-2 text-sm text-success transition hover:bg-success/15"
                     >
                       <ReceiptText className="size-4" /> Risiti ya Malipo
-                      <img src={c.risitiPicha} alt="Risiti" className="ml-auto h-12 w-16 rounded-lg object-cover ring-1 ring-line" />
+                      <Image src={c.risitiPicha} alt="Risiti" width={64} height={48} unoptimized className="ml-auto h-12 w-16 rounded-lg object-cover ring-1 ring-line" />
                     </button>
                   ) : null}
 

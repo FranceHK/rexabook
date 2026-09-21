@@ -82,3 +82,12 @@ export async function requireUser(): Promise<User> {
   }
   return user;
 }
+
+/** Redirects non-admin users away from system administration routes. */
+export async function requireAdmin(): Promise<User> {
+  const user = await requireUser();
+  if (user.role !== "ADMIN") {
+    redirect("/dashboard");
+  }
+  return user;
+}

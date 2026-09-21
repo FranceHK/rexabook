@@ -13,7 +13,7 @@ export const getDashboardData = unstable_cache(
     const [user, watejaCount, debts, recentPayments, chartPaymentRows, cargoRows] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, jina: true, jina_duka: true },
+        select: { id: true, jina: true, jina_duka: true, role: true },
       }),
       prisma.customer.count({ where: { mtumiajiId: userId } }),
       prisma.debt.findMany({

@@ -8,6 +8,7 @@ import { formDataToObject, parseZod, fail, type ActionResult } from "@/lib/actio
 import { buildKumbushoSMS, buildMtejaMpyaSMS, tumaSMS } from "@/lib/sms";
 import { bakaa as bakaaOf, toMoney } from "@/lib/format";
 import { DASHBOARD_CACHE_TAG } from "@/lib/cache-tags";
+import { countSmsUnits } from "@/lib/sms-pricing";
 
 /** Replicates wateja_add.php – adds a new customer for the signed-in user. */
 export async function createCustomerAction(
@@ -40,7 +41,7 @@ export async function createCustomerAction(
       jinaMteja: jina,
       jinaDuka: user.jina_duka ?? "Duka",
     });
-    await tumaSMS(simu, ujumbe);
+    await tumaSMS(user.id, simu, ujumbe);
   }
 
   revalidatePath("/customers");
@@ -144,7 +145,13 @@ export async function sendDebtReminderAction(customerId: number): Promise<Action
     bidhaaZilizobaki,
   });
 
-  const sent = await tumaSMS(customer.simu, ujumbe);
+  const units = countSmsUnits(ujumbe);
+  if (!user.smsEnabled) return fail("SMS zimezimwa. Ziwashe kwanza kwenye Mipangilio.");
+  if (user.smsBalance < units) {
+    return fail(`Salio halitoshi. Ujumbe huu unahitaji SMS ${units}, lakini una ${user.smsBalance}.`);
+  }
+
+  const sent = await tumaSMS(user.id, customer.simu, ujumbe);
   revalidatePath(`/customers/${customer.id}`);
 
   return sent

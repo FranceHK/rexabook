@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 
 const SESSION_COOKIE = "rexabook_session";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/customers", "/cargo", "/settings"];
+const PROTECTED_PREFIXES = ["/dashboard", "/customers", "/cargo", "/settings", "/admin"];
 const AUTH_PAGES = ["/login"];
 
 function getSecret(): Uint8Array {
@@ -49,6 +49,7 @@ export const config = {
     "/customers/:path*",
     "/cargo/:path*",
     "/settings/:path*",
+    "/admin/:path*",
     "/login",
     "/logout",
   ],

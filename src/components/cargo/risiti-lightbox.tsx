@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { X } from "lucide-react";
 
 export function RisitiLightbox({ src, onClose }: { src: string | null; onClose: () => void }) {
@@ -20,7 +21,7 @@ export function RisitiLightbox({ src, onClose }: { src: string | null; onClose: 
       >
         <X className="size-5" />
       </button>
-      <img src={src} alt="Risiti" className="max-h-[85vh] max-w-full rounded-xl shadow-2xl" />
+      <Image src={src} alt="Risiti" width={1400} height={1000} unoptimized className="max-h-[85vh] w-auto max-w-full rounded-xl object-contain shadow-2xl" />
     </div>
   );
 }

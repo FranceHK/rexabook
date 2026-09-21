@@ -103,7 +103,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka }}>
+    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
       {/* ============ Hero ============ */}
       <section
         className="anim-up relative mb-8 overflow-hidden rounded-2xl p-6 text-white shadow-glass md:p-8"

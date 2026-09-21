@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { ImagePlus, ReceiptText } from "lucide-react";
 import { uploadRisitiAction } from "@/actions/cargo";
 import { Modal } from "@/components/ui/modal";
@@ -65,7 +66,7 @@ export function CargoRisitiModal({ cargo, onClose }: { cargo: CargoClient; onClo
             className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-line-2 bg-surface-2 px-4 py-6 text-center transition hover:border-primary"
           >
             {preview ? (
-              <img src={preview} alt="Risiti preview" className="max-h-40 rounded-lg" />
+              <Image src={preview} alt="Risiti preview" width={320} height={160} unoptimized className="max-h-40 w-auto rounded-lg object-contain" />
             ) : (
               <>
                 <ImagePlus className="size-7 text-ink-3" />

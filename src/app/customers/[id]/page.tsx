@@ -68,7 +68,7 @@ export default async function CustomerDetailPage({
 
   const smsLog = customer.simu
     ? await prisma.smsLog.findMany({
-        where: { namba: customer.simu },
+        where: { namba: customer.simu, mtumiajiId: user.id },
         orderBy: { tarehe: "desc" },
         take: 12,
       })
@@ -105,7 +105,7 @@ export default async function CustomerDetailPage({
   };
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka }}>
+    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
       <CustomerDetailView data={data} />
     </AppShell>
   );

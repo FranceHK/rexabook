@@ -68,7 +68,7 @@ export async function createDebtAction(
       jumlaDeni,
       jinaDuka: user.jina_duka ?? "Duka",
     });
-    await tumaSMS(owned.simu, ujumbe);
+    await tumaSMS(user.id, owned.simu, ujumbe);
   }
 
   revalidatePath("/dashboard");
@@ -156,7 +156,7 @@ export async function addPaymentAction(
       jumlaMadeniYote,
       jinaDuka: userInfo?.jina_duka ?? "Duka",
     });
-    await tumaSMS(simuMteja, ujumbe);
+    await tumaSMS(user.id, simuMteja, ujumbe);
   }
 
   const ujumbe = imekamilika ? "Hongera! Deni limelipwa kikamilifu! 🎉" : "Malipo yamepokelewa.";

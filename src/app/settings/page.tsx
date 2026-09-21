@@ -2,17 +2,25 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { AppShell } from "@/components/layout/app-shell";
-import { SettingsView, type CompanyCardClient, type AccountClient } from "@/components/settings/settings-view";
+import { SettingsView, type CompanyCardClient } from "@/components/settings/settings-view";
+import type { SmsWalletClient } from "@/components/settings/sms-wallet-card";
 
 export const metadata: Metadata = { title: "Mipangilio" };
 
 export default async function SettingsPage() {
   const user = await requireUser();
 
-  const cards = await prisma.companyCard.findMany({
-    where: { mtumiajiId: user.id },
-    orderBy: { jinaKampuni: "asc" },
-  });
+  const [cards, purchases] = await Promise.all([
+    prisma.companyCard.findMany({
+      where: { mtumiajiId: user.id },
+      orderBy: { jinaKampuni: "asc" },
+    }),
+    prisma.smsPurchase.findMany({
+      where: { mtumiajiId: user.id },
+      orderBy: { tareheKuundwa: "desc" },
+      take: 8,
+    }),
+  ]);
 
   const companyCards: CompanyCardClient[] = cards.map((c) => ({
     id: c.id,
@@ -21,22 +29,26 @@ export default async function SettingsPage() {
     nambaMalipo: c.nambaMalipo,
   }));
 
-  const users = await prisma.user.findMany({
-    orderBy: { tareheKuundwa: "asc" },
-    select: { id: true, jina: true, jina_duka: true, simu: true, tareheKuundwa: true },
-  });
-
-  const accounts: AccountClient[] = users.map((u) => ({
-    id: u.id,
-    jina: u.jina,
-    jinaDuka: u.jina_duka,
-    simu: u.simu,
-    tareheKuundwa: u.tareheKuundwa.toISOString(),
-    niWewe: u.id === user.id,
-  }));
+  const smsAccount: SmsWalletClient = {
+    enabled: user.smsEnabled,
+    balance: user.smsBalance,
+    configured: Boolean(process.env.MESEJI_API_KEY || process.env.MESEJI_TOKEN),
+    snippeConfigured: Boolean(process.env.SNIPPE_API_KEY && process.env.SNIPPE_WEBHOOK_SECRET),
+    phone: user.simu,
+    purchases: purchases.map((purchase) => ({
+      id: purchase.id,
+      units: purchase.idadiSms,
+      total: purchase.jumla,
+      status: purchase.status,
+      reference: purchase.kumbukumbu,
+      provider: purchase.paymentProvider,
+      paymentStatus: purchase.paymentStatus,
+      createdAt: purchase.tareheKuundwa.toISOString(),
+    })),
+  };
 
   return (
-    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka }}>
+    <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN" }}>
       <SettingsView
         user={{
           jina: user.jina,
@@ -44,8 +56,7 @@ export default async function SettingsPage() {
           simu: user.simu,
         }}
         companyCards={companyCards}
-        accounts={accounts}
-        smsConfigured={Boolean(process.env.MESEJI_API_KEY)}
+        smsAccount={smsAccount}
       />
     </AppShell>
   );

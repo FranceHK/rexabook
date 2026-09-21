@@ -62,11 +62,17 @@ export async function registerAction(
   }
 
   const nenosiriHashed = await hash(nenosiri, 10);
+  const existingUsers = await prisma.user.count();
 
   let user;
   try {
     user = await prisma.user.create({
-      data: { jina, jina_duka: jinaDuka, nenosiri: nenosiriHashed },
+      data: {
+        jina,
+        jina_duka: jinaDuka,
+        nenosiri: nenosiriHashed,
+        role: existingUsers === 0 ? "ADMIN" : "USER",
+      },
     });
   } catch {
     return fail("Imeshindikana kuunda akaunti. Jaribu tena.");
