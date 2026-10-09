@@ -5,6 +5,7 @@ import { requireSales, subscriptionIsActive } from "@/lib/auth";
 import { SALES_COMMISSION_PERCENT, SUBSCRIPTION_PLANS } from "@/lib/plans";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { SalesPasswordCard } from "@/components/sales/sales-password-card";
 
 export const metadata: Metadata = { title: "Wateja Wangu" };
 export const dynamic = "force-dynamic";
@@ -123,6 +124,10 @@ export default async function SalesPage() {
             )}
           </CardBody>
         </Card>
+      </div>
+
+      <div className="mt-5 max-w-xl">
+        <SalesPasswordCard />
       </div>
     </AppShell>
   );

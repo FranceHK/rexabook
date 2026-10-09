@@ -2,11 +2,12 @@
 
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { hash } from "bcryptjs";
+import { compare, hash } from "bcryptjs";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
-import { fail, type ActionResult } from "@/lib/action-result";
+import { requireAdmin, requireSales } from "@/lib/auth";
+import { fail, parseZod, type ActionResult } from "@/lib/action-result";
+import { passwordSchema } from "@/lib/validation";
 
 // No 0/O/1/I so a code read out over the phone cannot be mistyped.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -70,4 +71,29 @@ export async function markCommissionsPaidAction(salesUserId: number): Promise<Ac
   revalidatePath("/admin/sales");
   revalidatePath("/sales");
   return { success: true, message: `Commission ${paid.count} za ${sales.jina} zimewekwa kuwa zimelipwa.` };
+}
+
+/** Lets a sales person replace the starting password the admin gave them. */
+export async function changeSalesPasswordAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const sales = await requireSales();
+  const parsed = parseZod(passwordSchema, {
+    la_zamani: formData.get("la_zamani"),
+    jipya: formData.get("jipya"),
+    thibitisha: formData.get("thibitisha"),
+  });
+  if (!parsed.success) return { success: false, message: parsed.message, fieldErrors: parsed.fieldErrors };
+
+  const { la_zamani, jipya } = parsed.data!;
+  if (!(await compare(la_zamani, sales.nenosiri))) return fail("Nenosiri lako la zamani si sahihi.");
+  if (la_zamani === jipya) return fail("Nenosiri jipya liwe tofauti na la zamani.");
+
+  try {
+    await prisma.user.update({ where: { id: sales.id }, data: { nenosiri: await hash(jipya, 10) } });
+  } catch {
+    return fail("Imeshindikana kubadilisha nenosiri. Jaribu tena.");
+  }
+  return { success: true, message: "Nenosiri limebadilishwa." };
 }
