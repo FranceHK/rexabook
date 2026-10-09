@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { businessIdFor, getBusinessOwner, requireUser, subscriptionIsActive } from "@/lib/auth";
+import { businessIdFor, getBusinessOwner, requireUser, subscriptionIsActive, subscriptionIsExempt } from "@/lib/auth";
 import { AppShell } from "@/components/layout/app-shell";
 import { BusinessView, type BusinessViewData } from "@/components/business/business-view";
 
@@ -47,6 +47,7 @@ export default async function BusinessPage() {
     subscription: {
       status: owner.subscriptionStatus,
       active: subscriptionIsActive(owner),
+      exempt: subscriptionIsExempt(owner),
       endsAt: owner.subscriptionEndsAt?.toISOString() ?? null,
     },
     stats: {

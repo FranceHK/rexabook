@@ -5,7 +5,7 @@ import { hash } from "bcryptjs";
 import { Prisma, type BusinessRole, type SalePaymentMethod } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { businessIdFor, getBusinessOwner, requireBusinessRole, subscriptionIsActive } from "@/lib/auth";
+import { businessIdFor, getBusinessOwner, requireBusinessRole, subscriptionIsActive, subscriptionIsExempt } from "@/lib/auth";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { normalizePhone } from "@/lib/sms";
 import { createSnippeSubscriptionPayment, getSnippePayment } from "@/lib/snippe";
@@ -386,6 +386,7 @@ export async function startSubscriptionPaymentAction(
   formData: FormData
 ): Promise<ActionResult> {
   const user = await requireBusinessRole(["OWNER"]);
+  if (subscriptionIsExempt(user)) return fail("Akaunti ya admin hailipii subscription.");
   if (!process.env.SNIPPE_API_KEY) return fail("Snippe haijaunganishwa.");
   const businessId = businessIdFor(user);
   const phone = normalizePhone(String(formData.get("namba_malipo") ?? "").trim());

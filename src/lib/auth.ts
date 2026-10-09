@@ -106,7 +106,13 @@ export async function requireBusinessRole(allowed: BusinessRole[]): Promise<User
   return user;
 }
 
-export function subscriptionIsActive(owner: Pick<User, "subscriptionStatus" | "subscriptionEndsAt">): boolean {
+/** System admins run the platform and never pay for it; only customer businesses do. */
+export function subscriptionIsExempt(owner: Pick<User, "role">): boolean {
+  return owner.role === "ADMIN";
+}
+
+export function subscriptionIsActive(owner: Pick<User, "role" | "subscriptionStatus" | "subscriptionEndsAt">): boolean {
+  if (subscriptionIsExempt(owner)) return true;
   if (owner.subscriptionStatus !== "ACTIVE" && owner.subscriptionStatus !== "TRIAL") return false;
   return Boolean(owner.subscriptionEndsAt && owner.subscriptionEndsAt.getTime() > Date.now());
 }
