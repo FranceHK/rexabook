@@ -2,7 +2,8 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import type { BusinessRole, User } from "@prisma/client";
+import { planHasFeature, type PlanFeature } from "@/lib/plans";
+import type { BusinessRole, SubscriptionPlan, User } from "@prisma/client";
 
 const SESSION_COOKIE = "rexabook_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -82,12 +83,29 @@ export async function getBusinessOwner(user: Pick<User, "id" | "ownerId">): Prom
   return prisma.user.findUnique({ where: { id: businessIdFor(user) } });
 }
 
-/** Throws a redirect to /login when the caller is not authenticated. */
+/**
+ * Throws a redirect to /login when the caller is not authenticated.
+ * Sales people have no business workspace, so they are sent to /sales.
+ */
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) {
-    redirect("/login");
+    // A valid cookie for a missing/blocked account: clear it instead of bouncing off /login.
+    redirect("/logout");
   }
+  if (user.role === "SALES") redirect("/sales");
+  if (user.ownerId) {
+    const owner = await getBusinessOwner(user);
+    if (!owner || !planAllows(owner, "staff")) redirect("/logout");
+  }
+  return user;
+}
+
+/** Only sales people may open the referral/commission workspace. */
+export async function requireSales(): Promise<User> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/logout");
+  if (user.role !== "SALES") redirect("/dashboard");
   return user;
 }
 
@@ -117,15 +135,26 @@ export function subscriptionIsActive(owner: Pick<User, "role" | "subscriptionSta
   return Boolean(owner.subscriptionEndsAt && owner.subscriptionEndsAt.getTime() > Date.now());
 }
 
-export async function requireActiveBusinessUser(): Promise<User> {
+/** Admins and businesses still on trial get everything; paying businesses get what their plan includes. */
+export function effectivePlan(owner: Pick<User, "role" | "subscriptionStatus" | "subscriptionPlan">): SubscriptionPlan {
+  if (subscriptionIsExempt(owner) || owner.subscriptionStatus === "TRIAL") return "FULL";
+  return owner.subscriptionPlan;
+}
+
+export function planAllows(owner: Pick<User, "role" | "subscriptionStatus" | "subscriptionPlan">, feature: PlanFeature): boolean {
+  return planHasFeature(effectivePlan(owner), feature);
+}
+
+export async function requireActiveBusinessUser(feature?: PlanFeature): Promise<User> {
   const user = await requireUser();
   const owner = await getBusinessOwner(user);
   if (!owner || !subscriptionIsActive(owner)) redirect("/business?subscription=1");
+  if (feature && !planAllows(owner, feature)) redirect("/business?upgrade=1");
   return user;
 }
 
-export async function requireActiveBusinessRole(allowed: BusinessRole[]): Promise<User> {
-  const user = await requireActiveBusinessUser();
+export async function requireActiveBusinessRole(allowed: BusinessRole[], feature?: PlanFeature): Promise<User> {
+  const user = await requireActiveBusinessUser(feature);
   if (!allowed.includes(user.businessRole)) redirect("/dashboard");
   return user;
 }

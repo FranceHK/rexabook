@@ -29,7 +29,7 @@ export interface CargoCreateInput {
 
 /** Replicates mzigo_add.php – creates a cargo order with its items. */
 export async function createCargoAction(input: CargoCreateInput): Promise<ActionResult> {
-  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"], "cargo");
   const businessId = businessIdFor(user);
 
   const parsed = parseZod(cargoCreateSchema, input);
@@ -81,7 +81,7 @@ export async function updateCargoHaliAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"], "cargo");
   const businessId = businessIdFor(user);
 
   const parsed = parseZod(cargoHaliSchema, {
@@ -130,7 +130,7 @@ export async function uploadRisitiAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"], "cargo");
   const businessId = businessIdFor(user);
 
   const mzigoId = Number(formData.get("mzigo_id"));
@@ -164,7 +164,7 @@ export async function uploadRisitiAction(
 
 /** Marks a single cargo item (row) as arrived; the whole cargo becomes "Imefika" once every item has arrived. */
 export async function markCargoItemArrivedAction(cargoItemId: number): Promise<ActionResult> {
-  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"], "cargo");
   const businessId = businessIdFor(user);
 
   const item = await prisma.cargoItem.findFirst({
@@ -198,7 +198,7 @@ export async function markCargoItemArrivedAction(cargoItemId: number): Promise<A
 
 /** Replicates mzigo_delete.php – deletes a cargo order (and its items). */
 export async function deleteCargoAction(cargoId: number): Promise<ActionResult> {
-  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"], "cargo");
   const businessId = businessIdFor(user);
 
   const cargo = await prisma.cargo.findFirst({

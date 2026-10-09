@@ -12,7 +12,7 @@ export default async function CargoPage({
 }: {
   searchParams: Promise<{ new?: string }>;
 }) {
-  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"]);
+  const user = await requireActiveBusinessRole(["OWNER", "MANAGER"], "cargo");
   const businessId = businessIdFor(user);
   const params = await searchParams;
 

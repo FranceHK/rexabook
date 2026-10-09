@@ -6,9 +6,9 @@ export const metadata: Metadata = { title: "Ingia" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; ref?: string }>;
 }) {
   const params = await searchParams;
   const initialTab = params.tab === "register" ? "register" : "login";
-  return <AuthScreen initialTab={initialTab} />;
+  return <AuthScreen initialTab={initialTab} referralCode={params.ref?.slice(0, 20) ?? ""} />;
 }

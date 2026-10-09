@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   BriefcaseBusiness,
   CreditCard,
+  Handshake,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -29,6 +30,7 @@ interface AppUser {
   jina: string;
   jinaDuka: string;
   isAdmin?: boolean;
+  isSales?: boolean;
   businessRole?: "OWNER" | "MANAGER" | "CASHIER";
 }
 
@@ -38,6 +40,7 @@ interface NavItem {
   icon: LucideIcon;
   accent: string;
   adminOnly?: boolean;
+  salesOnly?: boolean;
   roles?: Array<"OWNER" | "MANAGER" | "CASHIER">;
 }
 
@@ -49,10 +52,21 @@ const nav: NavItem[] = [
   { href: "/settings", label: "Mipangilio", icon: Settings, accent: "text-warning", roles: ["OWNER"] },
   { href: "/admin/sms", label: "Admin SMS", icon: ShieldCheck, accent: "text-danger", adminOnly: true },
   { href: "/admin/subscriptions", label: "Admin Malipo", icon: CreditCard, accent: "text-success", adminOnly: true },
+  { href: "/admin/sales", label: "Admin Sales", icon: Handshake, accent: "text-info", adminOnly: true },
+  { href: "/sales", label: "Wateja Wangu", icon: Handshake, accent: "text-primary", salesOnly: true },
 ];
+
+// Sales people only see their referral workspace; everyone else never sees it.
+function visibleNav(items: NavItem[], user: Pick<AppUser, "isAdmin" | "isSales" | "businessRole">): NavItem[] {
+  if (user.isSales) return items.filter((item) => item.salesOnly);
+  return items.filter(
+    (item) => !item.salesOnly && (!item.adminOnly || user.isAdmin) && (!item.roles || item.roles.includes(user.businessRole ?? "OWNER"))
+  );
+}
 
 // Bottom nav on phones/tablets: keep it to the 3 main screens.
 const mobileNav = nav.filter((n) => n.href !== "/settings" && n.href !== "/cargo" && !n.adminOnly);
+
 
 function initialsOf(jina: string): string {
   return jina
@@ -68,17 +82,19 @@ function NavLinks({
   onNavigate,
   collapsed = false,
   isAdmin = false,
+  isSales = false,
   businessRole = "OWNER",
 }: {
   pathname: string;
   onNavigate?: () => void;
   collapsed?: boolean;
   isAdmin?: boolean;
+  isSales?: boolean;
   businessRole?: "OWNER" | "MANAGER" | "CASHIER";
 }) {
   return (
     <nav className="flex flex-col gap-1.5">
-      {nav.filter((item) => (!item.adminOnly || isAdmin) && (!item.roles || item.roles.includes(businessRole))).map(({ href, label, icon: Icon, accent }) => {
+      {visibleNav(nav, { isAdmin, isSales, businessRole }).map(({ href, label, icon: Icon, accent }) => {
         const active = pathname === href || pathname.startsWith(href + "/");
         return (
           <Link
@@ -187,7 +203,7 @@ function SidebarBody({
           </div>
         </div>
         <div className={cn("rounded-lg border border-line bg-surface-2 px-3 py-2", collapsed && "hidden")}>
-          <p className="truncate text-xs font-medium text-ink-2">Akaunti ya duka</p>
+          <p className="truncate text-xs font-medium text-ink-2">{user.isSales ? "Akaunti ya sales" : "Akaunti ya duka"}</p>
           <p className="truncate text-sm font-semibold text-ink">{user.jinaDuka}</p>
         </div>
       </div>
@@ -196,7 +212,7 @@ function SidebarBody({
         <div className={cn("mb-2 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3", collapsed && "sr-only")}>
           Menyu Kuu
         </div>
-        <NavLinks pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} isAdmin={user.isAdmin} businessRole={user.businessRole} />
+        <NavLinks pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} isAdmin={user.isAdmin} isSales={user.isSales} businessRole={user.businessRole} />
       </div>
 
       <div className="border-t border-line px-3 py-4">
@@ -206,7 +222,7 @@ function SidebarBody({
           </span>
           <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
             <p className="truncate text-sm font-medium text-ink">{user.jina}</p>
-            <p className="truncate text-xs text-ink-3">{user.isAdmin ? "Admin" : "Mtumiaji"}</p>
+            <p className="truncate text-xs text-ink-3">{user.isAdmin ? "Admin" : user.isSales ? "Sales" : "Mtumiaji"}</p>
           </div>
         </div>
         <LogoutBtn onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} collapsed={collapsed} />
@@ -246,7 +262,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
     }
   }
 
-  const currentLabel = nav.find((n) => (!n.adminOnly || user.isAdmin) && (pathname === n.href || pathname.startsWith(n.href + "/")))?.label ?? "RexaBook";
+  const currentLabel = visibleNav(nav, user).find((n) => pathname === n.href || pathname.startsWith(n.href + "/"))?.label ?? "RexaBook";
 
   return (
     <div className="min-h-screen">
@@ -330,7 +346,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       {/* Mobile bottom navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(17,24,39,0.08)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto flex max-w-md items-stretch px-2">
-          {mobileNav.filter((item) => !item.roles || item.roles.includes(user.businessRole ?? "OWNER")).map(({ href, label, icon: Icon }) => {
+          {visibleNav(mobileNav, user).map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return (
               <Link

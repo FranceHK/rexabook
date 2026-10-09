@@ -17,7 +17,7 @@ function formError(state: ActionResult) {
   return !state.success && state.message ? state.message : undefined;
 }
 
-export function AuthScreen({ initialTab = "login" }: { initialTab?: "login" | "register" }) {
+export function AuthScreen({ initialTab = "login", referralCode = "" }: { initialTab?: "login" | "register"; referralCode?: string }) {
   const { theme, toggle } = useTheme();
   const router = useRouter();
   const [tab, setTab] = useState<"login" | "register">(initialTab);
@@ -160,6 +160,15 @@ export function AuthScreen({ initialTab = "login" }: { initialTab?: "login" | "r
                   <Input label="Nenosiri (herufi 6 au zaidi)" name="nenosiri" type="password" placeholder="••••••••" autoComplete="new-password" required />
                   <Input label="Rudia nenosiri" name="nenosiri2" type="password" placeholder="••••••••" autoComplete="new-password" required />
                 </div>
+                <Input
+                  label="Referral code ya aliyekuunganisha (si lazima)"
+                  name="referralCode"
+                  placeholder="mf. RX7K2MP"
+                  defaultValue={referralCode}
+                  maxLength={20}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                />
 
                 {formError(regState) ? (
                   <p className="rounded-lg border border-danger/25 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">

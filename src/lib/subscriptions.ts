@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { commissionFor, SALES_COMMISSION_PERCENT } from "@/lib/plans";
 import type { SnippePaymentStatus } from "@/lib/snippe";
 
 export class SubscriptionPaymentError extends Error {}
@@ -40,8 +41,23 @@ export async function completeSubscriptionPayment(input: {
     endsAt.setMonth(endsAt.getMonth() + payment.miezi);
     await tx.user.update({
       where: { id: owner.id },
-      data: { subscriptionStatus: "ACTIVE", subscriptionEndsAt: endsAt },
+      data: { subscriptionStatus: "ACTIVE", subscriptionEndsAt: endsAt, subscriptionPlan: payment.plan },
     });
+    if (owner.referredById) {
+      const sales = await tx.user.findFirst({ where: { id: owner.referredById, role: "SALES" }, select: { id: true } });
+      if (sales) {
+        await tx.salesCommission.create({
+          data: {
+            salesUserId: sales.id,
+            customerUserId: owner.id,
+            subscriptionPaymentId: payment.id,
+            kiasiMalipo: payment.kiasi,
+            asilimia: SALES_COMMISSION_PERCENT,
+            kiasi: commissionFor(payment.kiasi),
+          },
+        });
+      }
+    }
     await tx.auditLog.create({
       data: {
         mtumiajiId: owner.id,
@@ -49,7 +65,7 @@ export async function completeSubscriptionPayment(input: {
         action: "SUBSCRIPTION_ACTIVATED",
         entity: "SubscriptionPayment",
         entityId: String(payment.id),
-        details: JSON.stringify({ months: payment.miezi, amount: payment.kiasi, endsAt }),
+        details: JSON.stringify({ plan: payment.plan, months: payment.miezi, amount: payment.kiasi, endsAt }),
       },
     });
     return { activated: true, endsAt };

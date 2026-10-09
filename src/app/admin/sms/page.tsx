@@ -16,6 +16,7 @@ export default async function SmsAdminPage() {
 
   const [users, purchases, paidTotals, pendingTotals, sentTotals] = await Promise.all([
     prisma.user.findMany({
+      where: { role: { not: "SALES" } },
       orderBy: { tareheKuundwa: "asc" },
       select: {
         id: true,
@@ -82,7 +83,7 @@ export default async function SmsAdminPage() {
     id: user.id,
     name: user.jina,
     shopName: user.jina_duka,
-    role: user.role,
+    role: user.role === "ADMIN" ? "ADMIN" : "USER",
     smsEnabled: user.smsEnabled,
     smsBalance: user.smsBalance,
     sentUnits: user.smsLogs.reduce((sum, log) => sum + log.vipande, 0),

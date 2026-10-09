@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { businessIdFor, getBusinessOwner, requireUser, subscriptionIsActive, subscriptionIsExempt } from "@/lib/auth";
+import { businessIdFor, effectivePlan, getBusinessOwner, requireUser, subscriptionIsActive, subscriptionIsExempt } from "@/lib/auth";
+import { planHasFeature, SUBSCRIPTION_PLANS } from "@/lib/plans";
 import { AppShell } from "@/components/layout/app-shell";
 import { BusinessView, type BusinessViewData } from "@/components/business/business-view";
 
 export const metadata: Metadata = { title: "Biashara" };
 
-export default async function BusinessPage() {
+export default async function BusinessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ upgrade?: string }>;
+}) {
+  const params = await searchParams;
   const user = await requireUser();
   const businessId = businessIdFor(user);
   const owner = await getBusinessOwner(user);
   if (!owner) return null;
+  const plan = effectivePlan(owner);
 
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -48,8 +55,18 @@ export default async function BusinessPage() {
       status: owner.subscriptionStatus,
       active: subscriptionIsActive(owner),
       exempt: subscriptionIsExempt(owner),
+      trial: owner.subscriptionStatus === "TRIAL",
+      plan,
+      planLabel: SUBSCRIPTION_PLANS[plan].label,
       endsAt: owner.subscriptionEndsAt?.toISOString() ?? null,
     },
+    features: {
+      staff: planHasFeature(plan, "staff"),
+      cargo: planHasFeature(plan, "cargo"),
+      backup: planHasFeature(plan, "backup"),
+      audit: planHasFeature(plan, "audit"),
+    },
+    upgradeNotice: params.upgrade === "1",
     stats: {
       revenue,
       grossProfit,
@@ -91,8 +108,8 @@ export default async function BusinessPage() {
       items: cargo.items.filter((item) => !item.stockedAt).map((item) => ({ name: item.jinaBidhaa, quantity: item.idadi, total: Number(item.jumla) })),
     })),
     staff: staff.map((member) => ({ id: member.id, name: member.jina, role: member.businessRole, active: member.isActive, createdAt: member.tareheKuundwa.toISOString() })),
-    audits: audits.map((audit) => ({ id: audit.id, actor: audit.actor?.jina ?? "Mfumo", action: audit.action, entity: audit.entity, details: audit.details, createdAt: audit.tarehe.toISOString() })),
-    subscriptionPayments: subscriptionPayments.map((payment) => ({ id: payment.id, amount: payment.kiasi, months: payment.miezi, status: payment.status, paymentStatus: payment.paymentStatus, reference: payment.paymentReference, createdAt: payment.tareheKuundwa.toISOString() })),
+    audits: !planHasFeature(plan, "audit") ? [] : audits.map((audit) => ({ id: audit.id, actor: audit.actor?.jina ?? "Mfumo", action: audit.action, entity: audit.entity, details: audit.details, createdAt: audit.tarehe.toISOString() })),
+    subscriptionPayments: subscriptionPayments.map((payment) => ({ id: payment.id, amount: payment.kiasi, months: payment.miezi, plan: payment.plan, status: payment.status, paymentStatus: payment.paymentStatus, reference: payment.paymentReference, createdAt: payment.tareheKuundwa.toISOString() })),
   };
 
   return (

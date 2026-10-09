@@ -5,7 +5,8 @@ import { hash } from "bcryptjs";
 import { Prisma, type BusinessRole, type SalePaymentMethod } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { businessIdFor, getBusinessOwner, requireBusinessRole, subscriptionIsActive, subscriptionIsExempt } from "@/lib/auth";
+import { businessIdFor, getBusinessOwner, planAllows, requireBusinessRole, subscriptionIsActive, subscriptionIsExempt } from "@/lib/auth";
+import { isSubscriptionPlan, SUBSCRIPTION_PLANS } from "@/lib/plans";
 import { fail, type ActionResult } from "@/lib/action-result";
 import { normalizePhone } from "@/lib/sms";
 import { createSnippeSubscriptionPayment, getSnippePayment } from "@/lib/snippe";
@@ -271,6 +272,7 @@ export async function createSaleAction(input: SaleInput): Promise<BusinessAction
 export async function moveCargoToStockAction(cargoId: number, extraCost = 0): Promise<ActionResult> {
   const context = await activeBusinessContext(["OWNER", "MANAGER"]);
   if (!context.active) return fail("Subscription imeisha.");
+  if (!planAllows(context.owner, "cargo")) return fail("Mizigo inapatikana kwenye kifurushi cha Kamili.");
   if (!Number.isSafeInteger(cargoId) || !Number.isFinite(extraCost) || extraCost < 0) return fail("Taarifa za mzigo si sahihi.");
 
   try {
@@ -345,6 +347,7 @@ export async function createStaffAction(
   formData: FormData
 ): Promise<ActionResult> {
   const owner = await requireBusinessRole(["OWNER"]);
+  if (!planAllows(owner, "staff")) return fail("Wafanyakazi wanapatikana kwenye kifurushi cha Kamili.");
   const businessId = businessIdFor(owner);
   const username = String(formData.get("jina") ?? "").trim();
   const password = String(formData.get("nenosiri") ?? "");
@@ -390,13 +393,14 @@ export async function startSubscriptionPaymentAction(
   if (!process.env.SNIPPE_API_KEY) return fail("Snippe haijaunganishwa.");
   const businessId = businessIdFor(user);
   const phone = normalizePhone(String(formData.get("namba_malipo") ?? "").trim());
-  const months = Number(formData.get("miezi"));
+  const plan = formData.get("plan");
   if (!/^255\d{9}$/.test(phone)) return fail("Weka namba sahihi ya Tanzania.");
-  if (months !== 1 && months !== 12) return fail("Chagua mwezi mmoja au mwaka mmoja.");
-  const amount = months === 12 ? 150_000 : 15_000;
+  if (!isSubscriptionPlan(plan)) return fail("Chagua kifurushi cha Msingi au Kamili.");
+  const months = 1;
+  const amount = SUBSCRIPTION_PLANS[plan].price;
 
   const pending = await prisma.subscriptionPayment.create({
-    data: { mtumiajiId: businessId, kiasi: amount, miezi: months, paymentPhone: phone, paymentStatus: "creating" },
+    data: { mtumiajiId: businessId, kiasi: amount, miezi: months, plan, paymentPhone: phone, paymentStatus: "creating" },
   });
   const nameParts = user.jina.split(/\s+/).filter(Boolean);
   try {

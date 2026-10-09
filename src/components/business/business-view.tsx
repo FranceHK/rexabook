@@ -37,15 +37,19 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/theme/toast-provider";
+import { SUBSCRIPTION_PLANS } from "@/lib/plans";
 
 type BusinessRole = "OWNER" | "MANAGER" | "CASHIER";
 type PaymentMethod = "CASH" | "MOBILE_MONEY" | "BANK" | "CREDIT";
+type PlanId = "BASIC" | "FULL";
 type TabId = "overview" | "sales" | "products" | "expenses" | "cargo" | "team" | "subscription" | "audit";
 
 export interface BusinessViewData {
   role: BusinessRole;
   snippeConfigured: boolean;
-  subscription: { status: string; active: boolean; exempt: boolean; endsAt: string | null };
+  subscription: { status: string; active: boolean; exempt: boolean; trial: boolean; plan: PlanId; planLabel: string; endsAt: string | null };
+  features: { staff: boolean; cargo: boolean; backup: boolean; audit: boolean };
+  upgradeNotice: boolean;
   stats: { revenue: number; grossProfit: number; expenses: number; netProfit: number; stockValue: number; lowStock: number };
   products: Array<{ id: number; name: string; sku: string; unit: string; buyingPrice: number; sellingPrice: number; stock: number; lowStockAt: number }>;
   sales: Array<{ id: number; receiptNumber: string; customerName: string | null; customerPhone: string | null; servedBy: string | null; paymentMethod: PaymentMethod; total: number; paidAmount: number; profit: number; createdAt: string; items: Array<{ name: string; quantity: number; unitPrice: number; total: number }> }>;
@@ -54,7 +58,7 @@ export interface BusinessViewData {
   cargos: Array<{ id: number; supplier: string; tracking: string | null; baseCost: number; items: Array<{ name: string; quantity: number; total: number }> }>;
   staff: Array<{ id: number; name: string; role: BusinessRole; active: boolean; createdAt: string }>;
   audits: Array<{ id: number; actor: string; action: string; entity: string; details: string | null; createdAt: string }>;
-  subscriptionPayments: Array<{ id: number; amount: number; months: number; status: string; paymentStatus: string | null; reference: string | null; createdAt: string }>;
+  subscriptionPayments: Array<{ id: number; amount: number; months: number; plan: PlanId; status: string; paymentStatus: string | null; reference: string | null; createdAt: string }>;
 }
 
 const money = (value: number) => `TZS ${Math.round(value).toLocaleString("en-TZ")}`;
@@ -70,6 +74,8 @@ const tabOptions: Array<{ id: TabId; label: string; icon: typeof Activity; roles
   { id: "subscription", label: "Subscription", icon: Smartphone, roles: ["OWNER"] },
   { id: "audit", label: "Audit", icon: ClipboardList, roles: ["OWNER", "MANAGER"] },
 ];
+
+const PLAN_IDS: PlanId[] = ["BASIC", "FULL"];
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="px-5 py-10 text-center text-sm text-ink-3">{children}</div>;
@@ -88,7 +94,13 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
   const [paidAmount, setPaidAmount] = useState(0);
   const [extraCosts, setExtraCosts] = useState<Record<number, number>>({});
 
-  const availableTabs = tabOptions.filter((option) => option.roles.includes(data.role) && !(option.id === "subscription" && data.subscription.exempt));
+  const lockedTabs: Partial<Record<TabId, boolean>> = {
+    subscription: data.subscription.exempt,
+    cargo: !data.features.cargo,
+    team: !data.features.staff,
+    audit: !data.features.audit,
+  };
+  const availableTabs = tabOptions.filter((option) => option.roles.includes(data.role) && !lockedTabs[option.id]);
   const cartRows = useMemo(() => cart.map((item) => ({ ...item, product: data.products.find((product) => product.id === item.productId)! })).filter((item) => item.product), [cart, data.products]);
   const cartTotal = cartRows.reduce((sum, item) => sum + item.product.sellingPrice * item.quantity, 0);
 
@@ -159,10 +171,11 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
           <div><h1 className="text-2xl font-semibold text-ink">Biashara</h1><p className="mt-1 text-sm text-ink-3">Stock, mauzo, matumizi, faida na timu katika sehemu moja.</p></div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`badge ${subscriptionBadge}`}>{data.subscription.exempt ? "Admin · hakuna malipo" : data.subscription.active ? "Subscription hai" : "Subscription imeisha"}</span>
-          {data.role === "OWNER" && <a href="/api/backup" className="btn btn-outline btn-sm"><Download className="size-4" /> Backup</a>}
+          <span className={`badge ${subscriptionBadge}`}>{data.subscription.exempt ? "Admin · hakuna malipo" : !data.subscription.active ? "Subscription imeisha" : data.subscription.trial ? "Majaribio" : `Kifurushi: ${data.subscription.planLabel}`}</span>
+          {data.role === "OWNER" && data.features.backup && <a href="/api/backup" className="btn btn-outline btn-sm"><Download className="size-4" /> Backup</a>}
         </div>
       </header>
+      {data.upgradeNotice && !data.features.cargo && <p className="mb-5 rounded-lg bg-warning/10 px-4 py-3 text-sm text-ink-2">Sehemu hiyo inapatikana kwenye kifurushi cha Kamili. {data.role === "OWNER" ? "Pandisha kifurushi kwenye tab ya Subscription." : "Mwambie mmiliki apandishe kifurushi."}</p>}
 
       <div className="mb-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Sehemu za biashara">
         {availableTabs.map(({ id, label, icon: Icon }) => (
@@ -276,8 +289,8 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
 
       {tab === "subscription" && !data.subscription.exempt && (
         <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
-          <Card><CardHeader title="Subscription ya RexaBook" action={<span className={`badge ${subscriptionBadge}`}>{data.subscription.status}</span>} /><CardBody><div className="rounded-lg bg-primary/8 p-4"><p className="text-sm text-ink-3">Hali ya akaunti</p><p className="mt-1 text-xl font-semibold text-ink">{data.subscription.active ? "Inafanya kazi" : "Inahitaji malipo"}</p><p className="mt-1 text-sm text-ink-3">{data.subscription.endsAt ? `Inaisha ${date(data.subscription.endsAt)}` : "Hakuna tarehe ya mwisho"}</p></div><form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); void submitForm("subscription", event.currentTarget, startSubscriptionPaymentAction); }}><Select label="Mpango" name="miezi"><option value="1">Mwezi 1 · TZS 15,000</option><option value="12">Mwaka 1 · TZS 150,000</option></Select><Input label="Namba ya simu ya malipo" name="namba_malipo" type="tel" placeholder="0712345678" required /><Button type="submit" loading={busy === "subscription"} disabled={!data.snippeConfigured} icon={<Smartphone />} className="w-full">Lipa kwa Snippe</Button></form></CardBody></Card>
-          <Card><CardHeader title="Historia ya Subscription" /><CardBody className="!p-0">{data.subscriptionPayments.length === 0 ? <Empty>Hakuna malipo ya subscription bado.</Empty> : <div className="divide-y divide-line">{data.subscriptionPayments.map((payment) => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><p className="font-semibold text-ink">{payment.months === 12 ? "Mwaka mmoja" : "Mwezi mmoja"} · {money(payment.amount)}</p><p className="text-xs text-ink-3">{date(payment.createdAt)} · {payment.reference || "Haijapata reference"}</p></div><div className="flex items-center gap-2"><span className={`badge ${payment.status === "ACTIVE" ? "badge-done" : payment.status === "PENDING" ? "badge-wait" : "badge-danger"}`}>{payment.status}</span>{payment.status === "PENDING" && payment.reference && <Button size="sm" variant="outline" loading={busy === `sub-${payment.id}`} icon={<RefreshCw />} onClick={async () => { setBusy(`sub-${payment.id}`); const result = await checkSubscriptionPaymentAction(payment.id); setBusy(null); toast(result.message, result.success ? "success" : "error"); router.refresh(); }}>Kagua</Button>}</div></div>)}</div>}</CardBody></Card>
+          <Card><CardHeader title="Subscription ya RexaBook" action={<span className={`badge ${subscriptionBadge}`}>{data.subscription.status}</span>} /><CardBody><div className="rounded-lg bg-primary/8 p-4"><p className="text-sm text-ink-3">Hali ya akaunti</p><p className="mt-1 text-xl font-semibold text-ink">{data.subscription.active ? "Inafanya kazi" : "Inahitaji malipo"}</p><p className="mt-1 text-sm text-ink-3">{data.subscription.trial ? "Majaribio (vipengele vyote)" : `Kifurushi cha ${data.subscription.planLabel}`} · {data.subscription.endsAt ? `Inaisha ${date(data.subscription.endsAt)}` : "Hakuna tarehe ya mwisho"}</p></div><form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); void submitForm("subscription", event.currentTarget, startSubscriptionPaymentAction); }}><Select label="Kifurushi (mwezi mmoja)" name="plan" defaultValue={data.subscription.plan}>{PLAN_IDS.map((id) => <option key={id} value={id}>{SUBSCRIPTION_PLANS[id].label} · {money(SUBSCRIPTION_PLANS[id].price)}</option>)}</Select><ul className="space-y-1.5 text-xs text-ink-3">{PLAN_IDS.map((id) => <li key={id}><span className="font-semibold text-ink-2">{SUBSCRIPTION_PLANS[id].label}:</span> {SUBSCRIPTION_PLANS[id].summary}</li>)}</ul><Input label="Namba ya simu ya malipo" name="namba_malipo" type="tel" placeholder="0712345678" required /><Button type="submit" loading={busy === "subscription"} disabled={!data.snippeConfigured} icon={<Smartphone />} className="w-full">Lipa kwa Snippe</Button></form></CardBody></Card>
+          <Card><CardHeader title="Historia ya Subscription" /><CardBody className="!p-0">{data.subscriptionPayments.length === 0 ? <Empty>Hakuna malipo ya subscription bado.</Empty> : <div className="divide-y divide-line">{data.subscriptionPayments.map((payment) => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><p className="font-semibold text-ink">{SUBSCRIPTION_PLANS[payment.plan].label} · {payment.months === 12 ? "Mwaka mmoja" : "Mwezi mmoja"} · {money(payment.amount)}</p><p className="text-xs text-ink-3">{date(payment.createdAt)} · {payment.reference || "Haijapata reference"}</p></div><div className="flex items-center gap-2"><span className={`badge ${payment.status === "ACTIVE" ? "badge-done" : payment.status === "PENDING" ? "badge-wait" : "badge-danger"}`}>{payment.status}</span>{payment.status === "PENDING" && payment.reference && <Button size="sm" variant="outline" loading={busy === `sub-${payment.id}`} icon={<RefreshCw />} onClick={async () => { setBusy(`sub-${payment.id}`); const result = await checkSubscriptionPaymentAction(payment.id); setBusy(null); toast(result.message, result.success ? "success" : "error"); router.refresh(); }}>Kagua</Button>}</div></div>)}</div>}</CardBody></Card>
         </div>
       )}
 

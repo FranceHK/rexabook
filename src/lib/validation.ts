@@ -44,6 +44,12 @@ export const registerSchema = z
       .max(150, "Jina la duka ni refu mno."),
     nenosiri,
     nenosiri2: z.string(),
+    referralCode: z
+      .string()
+      .trim()
+      .max(20, "Referral code ni ndefu mno.")
+      .optional()
+      .or(z.literal("")),
   })
   .refine((v) => v.nenosiri === v.nenosiri2, {
     message: "Nenosiri hayafanani. Tafadhali jaribu tena.",

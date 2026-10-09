@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CreditCard, CircleDollarSign, Clock3, Store, TrendingUp } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireAdmin, subscriptionIsActive } from "@/lib/auth";
+import { SUBSCRIPTION_PLANS } from "@/lib/plans";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 
@@ -12,8 +13,8 @@ export default async function AdminSubscriptionsPage() {
   const admin = await requireAdmin();
   const [owners, payments] = await Promise.all([
     prisma.user.findMany({
-      where: { ownerId: null },
-      select: { id: true, jina: true, jina_duka: true, role: true, subscriptionStatus: true, subscriptionEndsAt: true, tareheKuundwa: true },
+      where: { ownerId: null, role: { not: "SALES" } },
+      select: { id: true, jina: true, jina_duka: true, role: true, subscriptionPlan: true, subscriptionStatus: true, subscriptionEndsAt: true, tareheKuundwa: true },
       orderBy: { tareheKuundwa: "desc" },
     }),
     prisma.subscriptionPayment.findMany({
@@ -42,8 +43,8 @@ export default async function AdminSubscriptionsPage() {
         ].map(([label, value, Icon, tone]) => <div key={String(label)} className="flex items-center justify-between rounded-lg border border-line bg-surface p-4 shadow-card"><div><p className="text-xs font-medium uppercase text-ink-3">{label as string}</p><p className="mt-2 text-xl font-semibold text-ink">{value as string}</p></div><span className={`grid size-10 place-items-center rounded-lg ${tone as string}`}><Icon className="size-5" /></span></div>)}
       </section>
       <div className="grid gap-5 xl:grid-cols-2">
-        <Card><CardHeader title="Biashara na Hali" /><CardBody className="!p-0"><div className="divide-y divide-line">{owners.map((owner) => { const active = subscriptionIsActive(owner); return <div key={owner.id} className="flex items-center justify-between gap-3 px-5 py-3"><div><p className="font-semibold text-ink">{owner.jina_duka}</p><p className="text-xs text-ink-3">{owner.jina} · {owner.role === "ADMIN" ? "Hailipii" : owner.subscriptionEndsAt?.toLocaleDateString("sw-TZ") || "Hakuna tarehe"}</p></div><span className={`badge ${active ? "badge-done" : "badge-danger"}`}>{owner.role === "ADMIN" ? "ADMIN" : active ? owner.subscriptionStatus : "EXPIRED"}</span></div>; })}</div></CardBody></Card>
-        <Card><CardHeader title="Malipo ya Karibuni" /><CardBody className="!p-0">{payments.length === 0 ? <p className="px-5 py-10 text-center text-sm text-ink-3">Hakuna malipo bado.</p> : <div className="divide-y divide-line">{payments.map((payment) => <div key={payment.id} className="flex items-center justify-between gap-3 px-5 py-3"><div><p className="font-semibold text-ink">{payment.user.jina_duka}</p><p className="text-xs text-ink-3">{payment.miezi} mwezi · {payment.tareheKuundwa.toLocaleDateString("sw-TZ")}</p></div><div className="text-right"><p className="font-semibold text-ink">{money(payment.kiasi)}</p><span className={`badge ${payment.status === "ACTIVE" ? "badge-done" : payment.status === "PENDING" ? "badge-wait" : "badge-danger"}`}>{payment.status}</span></div></div>)}</div>}</CardBody></Card>
+        <Card><CardHeader title="Biashara na Hali" /><CardBody className="!p-0"><div className="divide-y divide-line">{owners.map((owner) => { const active = subscriptionIsActive(owner); return <div key={owner.id} className="flex items-center justify-between gap-3 px-5 py-3"><div><p className="font-semibold text-ink">{owner.jina_duka}</p><p className="text-xs text-ink-3">{owner.jina} · {owner.role === "ADMIN" ? "Hailipii" : owner.subscriptionStatus === "TRIAL" ? "Majaribio · " + (owner.subscriptionEndsAt?.toLocaleDateString("sw-TZ") || "Hakuna tarehe") : SUBSCRIPTION_PLANS[owner.subscriptionPlan].label + " · " + ( owner.subscriptionEndsAt?.toLocaleDateString("sw-TZ") || "Hakuna tarehe")}</p></div><span className={`badge ${active ? "badge-done" : "badge-danger"}`}>{owner.role === "ADMIN" ? "ADMIN" : active ? owner.subscriptionStatus : "EXPIRED"}</span></div>; })}</div></CardBody></Card>
+        <Card><CardHeader title="Malipo ya Karibuni" /><CardBody className="!p-0">{payments.length === 0 ? <p className="px-5 py-10 text-center text-sm text-ink-3">Hakuna malipo bado.</p> : <div className="divide-y divide-line">{payments.map((payment) => <div key={payment.id} className="flex items-center justify-between gap-3 px-5 py-3"><div><p className="font-semibold text-ink">{payment.user.jina_duka}</p><p className="text-xs text-ink-3">{SUBSCRIPTION_PLANS[payment.plan].label} · {payment.tareheKuundwa.toLocaleDateString("sw-TZ")}</p></div><div className="text-right"><p className="font-semibold text-ink">{money(payment.kiasi)}</p><span className={`badge ${payment.status === "ACTIVE" ? "badge-done" : payment.status === "PENDING" ? "badge-wait" : "badge-danger"}`}>{payment.status}</span></div></div>)}</div>}</CardBody></Card>
       </div>
     </AppShell>
   );

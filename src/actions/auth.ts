@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { hash, compare } from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { loginSchema, registerSchema } from "@/lib/validation";
-import { createSession, destroySession } from "@/lib/auth";
+import { createSession, destroySession, getBusinessOwner, planAllows } from "@/lib/auth";
 import { formDataToObject, parseZod, fail, type ActionResult } from "@/lib/action-result";
 
 export async function loginAction(
@@ -41,8 +41,19 @@ export async function loginAction(
     return fail("Jina la mtumiaji au nenosiri si sahihi.");
   }
 
+  if (!user.isActive) {
+    return fail("Akaunti hii imezuiwa. Wasiliana na msimamizi wako.");
+  }
+
+  if (user.ownerId) {
+    const owner = await getBusinessOwner(user);
+    if (!owner || !planAllows(owner, "staff")) {
+      return fail("Kifurushi cha duka hili hakiruhusu wafanyakazi. Mmiliki apandishe kwenda Kamili.");
+    }
+  }
+
   await createSession(user.id);
-  redirect("/dashboard");
+  redirect(user.role === "SALES" ? "/sales" : "/dashboard");
 }
 
 export async function registerAction(
@@ -53,12 +64,25 @@ export async function registerAction(
   if (!parsed.success) return { success: false, message: parsed.message, fieldErrors: parsed.fieldErrors };
 
   const { jina, jinaDuka, nenosiri } = parsed.data!;
+  const referralCode = parsed.data!.referralCode?.toUpperCase() ?? "";
 
   const exists = await prisma.user.findFirst({
     where: { jina: { equals: jina, mode: "insensitive" } },
   });
   if (exists) {
     return fail(`Jina la mtumiaji "${jina}" tayari linatumiwa.`);
+  }
+
+  let referredById: number | null = null;
+  if (referralCode) {
+    const sales = await prisma.user.findFirst({
+      where: { referralCode, role: "SALES", isActive: true },
+      select: { id: true },
+    });
+    if (!sales) {
+      return { success: false, message: "Referral code si sahihi. Ihakiki au iache wazi.", fieldErrors: { referralCode: "Referral code si sahihi." } };
+    }
+    referredById = sales.id;
   }
 
   const nenosiriHashed = await hash(nenosiri, 10);
@@ -76,6 +100,7 @@ export async function registerAction(
         role: existingUsers === 0 ? "ADMIN" : "USER",
         subscriptionStatus: "TRIAL",
         subscriptionEndsAt: trialEndsAt,
+        referredById,
       },
     });
   } catch {

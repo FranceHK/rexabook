@@ -45,6 +45,12 @@ enum SmsStatus {
 enum UserRole {
   USER
   ADMIN
+  SALES
+}
+
+enum SubscriptionPlan {
+  BASIC
+  FULL
 }
 
 enum SmsPurchaseStatus {
@@ -106,10 +112,17 @@ model User {
   isActive           Boolean            @default(true)
   subscriptionStatus SubscriptionStatus @default(TRIAL)
   subscriptionEndsAt DateTime?
+  subscriptionPlan   SubscriptionPlan   @default(FULL)
+  referralCode       String?            @unique @db.VarChar(20)
+  referredById       Int?
   tareheKuundwa      DateTime           @default(now())
 
   owner                User?                 @relation("BusinessStaff", fields: [ownerId], references: [id], onDelete: Cascade)
   staff                User[]                @relation("BusinessStaff")
+  referredBy           User?                 @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals            User[]                @relation("Referrals")
+  earnedCommissions    SalesCommission[]     @relation("CommissionSales")
+  generatedCommissions SalesCommission[]     @relation("CommissionCustomer")
   customers            Customer[]
   debts                Debt[]
   cargos               Cargo[]
@@ -127,6 +140,7 @@ model User {
   performedAudits      AuditLog[]            @relation("AuditActor")
 
   @@index([ownerId])
+  @@index([referredById])
   @@map("watumiaji")
 }
 
@@ -400,6 +414,7 @@ model SubscriptionPayment {
   mtumiajiId       Int
   kiasi            Int                @default(15000)
   miezi            Int                @default(1)
+  plan             SubscriptionPlan   @default(FULL)
   status           SubscriptionStatus @default(PENDING)
   paymentProvider  String             @default("SNIPPE") @db.VarChar(30)
   paymentReference String?            @unique @db.VarChar(120)
@@ -410,11 +425,32 @@ model SubscriptionPayment {
   tareheKuundwa    DateTime           @default(now())
   tareheKulipwa    DateTime?
 
-  user User @relation(fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [mtumiajiId], references: [id], onDelete: Cascade)
+  commission SalesCommission?
 
   @@index([mtumiajiId])
   @@index([status])
   @@map("subscription_malipo")
+}
+
+model SalesCommission {
+  id                    Int       @id @default(autoincrement())
+  salesUserId           Int
+  customerUserId        Int
+  subscriptionPaymentId Int       @unique
+  kiasiMalipo           Int
+  asilimia              Int
+  kiasi                 Int
+  tarehe                DateTime  @default(now())
+  tareheKulipwa         DateTime?
+
+  sales    User                @relation("CommissionSales", fields: [salesUserId], references: [id], onDelete: Cascade)
+  customer User                @relation("CommissionCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  payment  SubscriptionPayment @relation(fields: [subscriptionPaymentId], references: [id], onDelete: Cascade)
+
+  @@index([salesUserId])
+  @@index([customerUserId])
+  @@map("sales_commission")
 }
 
 model AuditLog {
