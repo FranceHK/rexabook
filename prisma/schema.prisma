@@ -115,6 +115,7 @@ model User {
   subscriptionPlan   SubscriptionPlan   @default(FULL)
   referralCode       String?            @unique @db.VarChar(20)
   referredById       Int?
+  mustChangePassword Boolean            @default(false)
   tareheKuundwa      DateTime           @default(now())
 
   owner                User?                 @relation("BusinessStaff", fields: [ownerId], references: [id], onDelete: Cascade)

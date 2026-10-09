@@ -54,7 +54,15 @@ const nav: NavItem[] = [
   { href: "/admin/subscriptions", label: "Admin Malipo", icon: CreditCard, accent: "text-success", adminOnly: true },
   { href: "/admin/sales", label: "Admin Sales", icon: Handshake, accent: "text-info", adminOnly: true },
   { href: "/sales", label: "Wateja Wangu", icon: Handshake, accent: "text-primary", salesOnly: true },
+  { href: "/sales/settings", label: "Mipangilio", icon: Settings, accent: "text-warning", salesOnly: true },
 ];
+
+// The most specific item wins, so /sales/settings does not also light up /sales.
+function activeHref(items: NavItem[], pathname: string): string | undefined {
+  return items
+    .filter((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+}
 
 // Sales people only see their referral workspace; everyone else never sees it.
 function visibleNav(items: NavItem[], user: Pick<AppUser, "isAdmin" | "isSales" | "businessRole">): NavItem[] {
@@ -92,10 +100,12 @@ function NavLinks({
   isSales?: boolean;
   businessRole?: "OWNER" | "MANAGER" | "CASHIER";
 }) {
+  const items = visibleNav(nav, { isAdmin, isSales, businessRole });
+  const current = activeHref(items, pathname);
   return (
     <nav className="flex flex-col gap-1.5">
-      {visibleNav(nav, { isAdmin, isSales, businessRole }).map(({ href, label, icon: Icon, accent }) => {
-        const active = pathname === href || pathname.startsWith(href + "/");
+      {items.map(({ href, label, icon: Icon, accent }) => {
+        const active = href === current;
         return (
           <Link
             key={href}
@@ -262,7 +272,9 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
     }
   }
 
-  const currentLabel = visibleNav(nav, user).find((n) => pathname === n.href || pathname.startsWith(n.href + "/"))?.label ?? "RexaBook";
+  const visibleItems = visibleNav(nav, user);
+  const currentHref = activeHref(visibleItems, pathname);
+  const currentLabel = visibleItems.find((n) => n.href === currentHref)?.label ?? "RexaBook";
 
   return (
     <div className="min-h-screen">
@@ -347,7 +359,7 @@ export function AppShell({ user, children }: { user: AppUser; children: React.Re
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-10px_30px_rgba(17,24,39,0.08)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto flex max-w-md items-stretch px-2">
           {visibleNav(mobileNav, user).map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(href + "/");
+            const active = href === currentHref;
             return (
               <Link
                 key={href}

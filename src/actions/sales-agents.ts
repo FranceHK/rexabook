@@ -12,23 +12,35 @@ import { passwordSchema } from "@/lib/validation";
 // No 0/O/1/I so a code read out over the phone cannot be mistyped.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-function newReferralCode(): string {
-  let code = "RX";
-  for (let i = 0; i < 5; i += 1) code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
-  return code;
+function randomChars(length: number): string {
+  let out = "";
+  for (let i = 0; i < length; i += 1) out += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  return out;
 }
+
+function newReferralCode(): string {
+  return `RX${randomChars(5)}`;
+}
+
+/** Login details the admin copies into an SMS; the password is shown once and never stored in plain text. */
+export interface SalesCredentials {
+  username: string;
+  password: string;
+  code: string;
+}
+
+export type SalesCredentialsResult = ActionResult & { credentials?: SalesCredentials };
 
 export async function createSalesPersonAction(
   _prev: ActionResult | null,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<SalesCredentialsResult> {
   await requireAdmin();
   const username = String(formData.get("jina") ?? "").trim();
   const phone = String(formData.get("simu") ?? "").trim();
-  const password = String(formData.get("nenosiri") ?? "");
+  const password = randomChars(8);
   if (!username || username.length > 100) return fail("Weka jina la kuingia la sales person.");
   if (phone.length > 20) return fail("Namba ya simu ni ndefu mno.");
-  if (password.length < 6) return fail("Nenosiri liwe na herufi 6 au zaidi.");
   if (await prisma.user.findFirst({ where: { jina: { equals: username, mode: "insensitive" } } })) return fail("Jina hilo tayari linatumika.");
 
   const nenosiri = await hash(password, 10);
@@ -36,10 +48,10 @@ export async function createSalesPersonAction(
     const referralCode = newReferralCode();
     try {
       await prisma.user.create({
-        data: { jina: username, nenosiri, jina_duka: "RexaBook Sales", simu: phone || null, role: "SALES", referralCode },
+        data: { jina: username, nenosiri, jina_duka: "RexaBook Sales", simu: phone || null, role: "SALES", referralCode, mustChangePassword: true },
       });
       revalidatePath("/admin/sales");
-      return { success: true, message: `${username} ameongezwa. Referral code yake ni ${referralCode}.` };
+      return { success: true, message: `${username} ameongezwa. Nakili ujumbe wake umtumie.`, credentials: { username, password, code: referralCode } };
     } catch (error) {
       const duplicateCode = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
         && String(error.meta?.target ?? "").includes("referralCode");
@@ -56,6 +68,24 @@ export async function toggleSalesPersonAction(salesUserId: number): Promise<Acti
   const updated = await prisma.user.update({ where: { id: sales.id }, data: { isActive: !sales.isActive } });
   revalidatePath("/admin/sales");
   return { success: true, message: updated.isActive ? `${sales.jina} ameruhusiwa kuingia.` : `${sales.jina} amezuiwa kuingia.` };
+}
+
+/** Replaces the password with a new temporary one so the admin can send fresh login details. */
+export async function resetSalesPasswordAction(salesUserId: number): Promise<SalesCredentialsResult> {
+  await requireAdmin();
+  const sales = await prisma.user.findFirst({ where: { id: salesUserId, role: "SALES" } });
+  if (!sales) return fail("Sales person hapatikani.");
+  const password = randomChars(8);
+  await prisma.user.update({
+    where: { id: sales.id },
+    data: { nenosiri: await hash(password, 10), mustChangePassword: true },
+  });
+  revalidatePath("/admin/sales");
+  return {
+    success: true,
+    message: `Nenosiri jipya la ${sales.jina} limetengenezwa. Nakili ujumbe umtumie.`,
+    credentials: { username: sales.jina, password, code: sales.referralCode ?? "-" },
+  };
 }
 
 /** Records that the admin has paid out every commission the sales person was still owed. */
@@ -91,9 +121,37 @@ export async function changeSalesPasswordAction(
   if (la_zamani === jipya) return fail("Nenosiri jipya liwe tofauti na la zamani.");
 
   try {
-    await prisma.user.update({ where: { id: sales.id }, data: { nenosiri: await hash(jipya, 10) } });
+    await prisma.user.update({ where: { id: sales.id }, data: { nenosiri: await hash(jipya, 10), mustChangePassword: false } });
   } catch {
     return fail("Imeshindikana kubadilisha nenosiri. Jaribu tena.");
   }
+  revalidatePath("/sales");
+  revalidatePath("/admin/sales");
   return { success: true, message: "Nenosiri limebadilishwa." };
+}
+
+/** Lets a sales person keep their own login name and phone number up to date. */
+export async function updateSalesProfileAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const sales = await requireSales();
+  const username = String(formData.get("jina") ?? "").trim();
+  const phone = String(formData.get("simu") ?? "").trim();
+  if (!username || username.length > 100) return fail("Weka jina la kuingia.");
+  if (phone.length > 20) return fail("Namba ya simu ni ndefu mno.");
+  const taken = await prisma.user.findFirst({
+    where: { jina: { equals: username, mode: "insensitive" }, id: { not: sales.id } },
+    select: { id: true },
+  });
+  if (taken) return fail("Jina hilo tayari linatumika.");
+
+  try {
+    await prisma.user.update({ where: { id: sales.id }, data: { jina: username, simu: phone || null } });
+  } catch {
+    return fail("Imeshindikana kuhifadhi taarifa. Jaribu tena.");
+  }
+  revalidatePath("/sales");
+  revalidatePath("/admin/sales");
+  return { success: true, message: "Taarifa zako zimehifadhiwa." };
 }
