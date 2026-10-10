@@ -20,6 +20,7 @@ import {
   BriefcaseBusiness,
   CreditCard,
   Handshake,
+  BarChart3,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -49,6 +50,7 @@ const nav: NavItem[] = [
   { href: "/business", label: "Biashara", icon: BriefcaseBusiness, accent: "text-warning" },
   { href: "/customers", label: "Wadaiwa", icon: Users, accent: "text-info" },
   { href: "/cargo", label: "Mizigo", icon: Package, accent: "text-success", roles: ["OWNER", "MANAGER"] },
+  { href: "/reports", label: "Ripoti", icon: BarChart3, accent: "text-info", roles: ["OWNER", "MANAGER"] },
   { href: "/settings", label: "Mipangilio", icon: Settings, accent: "text-warning", roles: ["OWNER"] },
   { href: "/admin/sms", label: "Admin SMS", icon: ShieldCheck, accent: "text-danger", adminOnly: true },
   { href: "/admin/subscriptions", label: "Admin Malipo", icon: CreditCard, accent: "text-success", adminOnly: true },
@@ -73,7 +75,7 @@ function visibleNav(items: NavItem[], user: Pick<AppUser, "isAdmin" | "isSales" 
 }
 
 // Bottom nav on phones/tablets: keep it to the 3 main screens.
-const mobileNav = nav.filter((n) => n.href !== "/settings" && n.href !== "/cargo" && !n.adminOnly);
+const mobileNav = nav.filter((n) => n.href !== "/settings" && n.href !== "/cargo" && n.href !== "/reports" && !n.adminOnly);
 
 
 function initialsOf(jina: string): string {

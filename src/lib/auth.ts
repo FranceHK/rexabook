@@ -145,6 +145,12 @@ export function planAllows(owner: Pick<User, "role" | "subscriptionStatus" | "su
   return planHasFeature(effectivePlan(owner), feature);
 }
 
+/** Whole days of access left, rounded up; 0 once the subscription has lapsed. */
+export function subscriptionDaysLeft(owner: Pick<User, "subscriptionEndsAt">): number {
+  if (!owner.subscriptionEndsAt) return 0;
+  return Math.max(0, Math.ceil((owner.subscriptionEndsAt.getTime() - Date.now()) / 86_400_000));
+}
+
 export async function requireActiveBusinessUser(feature?: PlanFeature): Promise<User> {
   const user = await requireUser();
   const owner = await getBusinessOwner(user);

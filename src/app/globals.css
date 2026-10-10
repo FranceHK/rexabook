@@ -64,6 +64,12 @@
   --warning: #d97706;
   --info: #7c3aed;
 
+  /* Chart series: fixed order, validated for colour-blind separation on --surface. */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+
   --glass-bg: rgba(255, 255, 255, 0.82);
   --glass-line: rgba(23, 32, 51, 0.08);
   --glass-shadow: 0 18px 45px rgba(17, 24, 39, 0.08);
@@ -94,6 +100,11 @@
   --danger: #f24848;
   --warning: #f5a524;
   --info: #9d86f8;
+
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
 
   --glass-bg: rgba(18, 21, 29, 0.62);
   --glass-line: rgba(233, 236, 244, 0.09);

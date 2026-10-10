@@ -14,7 +14,6 @@ import {
   PackageCheck,
   Plus,
   ReceiptText,
-  RefreshCw,
   ShoppingCart,
   Smartphone,
   TrendingUp,
@@ -23,13 +22,10 @@ import {
 } from "lucide-react";
 import {
   adjustProductStockAction,
-  checkSubscriptionPaymentAction,
   createExpenseAction,
   createProductAction,
   createSaleAction,
   createStaffAction,
-  moveCargoToStockAction,
-  startSubscriptionPaymentAction,
   toggleStaffAction,
 } from "@/actions/business";
 import { Button } from "@/components/ui/button";
@@ -37,17 +33,17 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/theme/toast-provider";
-import { SUBSCRIPTION_PLANS } from "@/lib/plans";
+import { ExpiredNotice, SubscriptionPanel } from "@/components/business/subscription-panel";
 
 type BusinessRole = "OWNER" | "MANAGER" | "CASHIER";
 type PaymentMethod = "CASH" | "MOBILE_MONEY" | "BANK" | "CREDIT";
 type PlanId = "BASIC" | "FULL";
-type TabId = "overview" | "sales" | "products" | "expenses" | "cargo" | "team" | "subscription" | "audit";
+type TabId = "overview" | "sales" | "products" | "expenses" | "team" | "subscription" | "audit";
 
 export interface BusinessViewData {
   role: BusinessRole;
   snippeConfigured: boolean;
-  subscription: { status: string; active: boolean; exempt: boolean; trial: boolean; plan: PlanId; planLabel: string; endsAt: string | null };
+  subscription: { status: string; active: boolean; exempt: boolean; trial: boolean; plan: PlanId; planLabel: string; endsAt: string | null; daysLeft: number };
   features: { staff: boolean; cargo: boolean; backup: boolean; audit: boolean };
   upgradeNotice: boolean;
   stats: { revenue: number; grossProfit: number; expenses: number; netProfit: number; stockValue: number; lowStock: number };
@@ -55,7 +51,6 @@ export interface BusinessViewData {
   sales: Array<{ id: number; receiptNumber: string; customerName: string | null; customerPhone: string | null; servedBy: string | null; paymentMethod: PaymentMethod; total: number; paidAmount: number; profit: number; createdAt: string; items: Array<{ name: string; quantity: number; unitPrice: number; total: number }> }>;
   expenses: Array<{ id: number; category: string; amount: number; note: string | null; createdAt: string }>;
   customers: Array<{ id: number; jina: string; simu: string | null }>;
-  cargos: Array<{ id: number; supplier: string; tracking: string | null; baseCost: number; items: Array<{ name: string; quantity: number; total: number }> }>;
   staff: Array<{ id: number; name: string; role: BusinessRole; active: boolean; createdAt: string }>;
   audits: Array<{ id: number; actor: string; action: string; entity: string; details: string | null; createdAt: string }>;
   subscriptionPayments: Array<{ id: number; amount: number; months: number; plan: PlanId; status: string; paymentStatus: string | null; reference: string | null; createdAt: string }>;
@@ -69,13 +64,10 @@ const tabOptions: Array<{ id: TabId; label: string; icon: typeof Activity; roles
   { id: "sales", label: "Mauzo", icon: ShoppingCart, roles: ["OWNER", "MANAGER", "CASHIER"] },
   { id: "products", label: "Bidhaa", icon: Boxes, roles: ["OWNER", "MANAGER"] },
   { id: "expenses", label: "Matumizi", icon: WalletCards, roles: ["OWNER", "MANAGER"] },
-  { id: "cargo", label: "Mzigo → Stock", icon: PackageCheck, roles: ["OWNER", "MANAGER"] },
   { id: "team", label: "Wafanyakazi", icon: UserRoundCog, roles: ["OWNER"] },
   { id: "subscription", label: "Subscription", icon: Smartphone, roles: ["OWNER"] },
   { id: "audit", label: "Audit", icon: ClipboardList, roles: ["OWNER", "MANAGER"] },
 ];
-
-const PLAN_IDS: PlanId[] = ["BASIC", "FULL"];
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <div className="px-5 py-10 text-center text-sm text-ink-3">{children}</div>;
@@ -84,7 +76,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 export function BusinessView({ data }: { data: BusinessViewData }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [tab, setTab] = useState<TabId>("overview");
+  // An owner whose subscription lapsed lands straight on the place to fix it.
+  const [tab, setTab] = useState<TabId>(!data.subscription.active && data.role === "OWNER" ? "subscription" : "overview");
   const [busy, setBusy] = useState<string | null>(null);
   const [saleProductId, setSaleProductId] = useState(data.products[0]?.id ?? 0);
   const [saleQuantity, setSaleQuantity] = useState(1);
@@ -92,11 +85,9 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [customerId, setCustomerId] = useState(0);
   const [paidAmount, setPaidAmount] = useState(0);
-  const [extraCosts, setExtraCosts] = useState<Record<number, number>>({});
 
   const lockedTabs: Partial<Record<TabId, boolean>> = {
     subscription: data.subscription.exempt,
-    cargo: !data.features.cargo,
     team: !data.features.staff,
     audit: !data.features.audit,
   };
@@ -175,6 +166,7 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
           {data.role === "OWNER" && data.features.backup && <a href="/api/backup" className="btn btn-outline btn-sm"><Download className="size-4" /> Backup</a>}
         </div>
       </header>
+      {!data.subscription.active && tab !== "subscription" && <div className="mb-5"><ExpiredNotice owner={data.role === "OWNER"} /></div>}
       {data.upgradeNotice && !data.features.cargo && <p className="mb-5 rounded-lg bg-warning/10 px-4 py-3 text-sm text-ink-2">Sehemu hiyo inapatikana kwenye kifurushi cha Kamili. {data.role === "OWNER" ? "Pandisha kifurushi kwenye tab ya Subscription." : "Mwambie mmiliki apandishe kifurushi."}</p>}
 
       <div className="mb-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Sehemu za biashara">
@@ -278,7 +270,6 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
         </div>
       )}
 
-      {tab === "cargo" && <Card><CardHeader title="Mizigo Iliyofika Inayosubiri Stock" action={<span className="badge badge-info">{data.cargos.length}</span>} /><CardBody className="!p-0">{data.cargos.length === 0 ? <Empty>Hakuna mzigo unaosubiri kuingia stock.</Empty> : <div className="divide-y divide-line">{data.cargos.map((cargo) => <div key={cargo.id} className="grid gap-4 px-5 py-4 lg:grid-cols-[1fr_220px_auto] lg:items-end"><div><p className="font-semibold text-ink">{cargo.supplier}</p><p className="mt-1 text-xs text-ink-3">{cargo.tracking || `Mzigo #${cargo.id}`} · {cargo.items.length} bidhaa · gharama {money(cargo.baseCost)}</p><p className="mt-2 text-sm text-ink-2">{cargo.items.map((item) => `${item.name} (${item.quantity})`).join(", ")}</p></div><Input label="Usafiri/kodi za ziada" type="number" min="0" value={extraCosts[cargo.id] ?? 0} onChange={(e) => setExtraCosts((current) => ({ ...current, [cargo.id]: Number(e.target.value) }))} /><Button loading={busy === `cargo-${cargo.id}`} icon={<PackageCheck />} onClick={async () => { setBusy(`cargo-${cargo.id}`); const result = await moveCargoToStockAction(cargo.id, extraCosts[cargo.id] ?? 0); setBusy(null); toast(result.message, result.success ? "success" : "error"); if (result.success) router.refresh(); }}>Ingiza Stock</Button></div>)}</div>}</CardBody></Card>}
 
       {tab === "team" && (
         <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
@@ -288,10 +279,7 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
       )}
 
       {tab === "subscription" && !data.subscription.exempt && (
-        <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
-          <Card><CardHeader title="Subscription ya RexaBook" action={<span className={`badge ${subscriptionBadge}`}>{data.subscription.status}</span>} /><CardBody><div className="rounded-lg bg-primary/8 p-4"><p className="text-sm text-ink-3">Hali ya akaunti</p><p className="mt-1 text-xl font-semibold text-ink">{data.subscription.active ? "Inafanya kazi" : "Inahitaji malipo"}</p><p className="mt-1 text-sm text-ink-3">{data.subscription.trial ? "Majaribio (vipengele vyote)" : `Kifurushi cha ${data.subscription.planLabel}`} · {data.subscription.endsAt ? `Inaisha ${date(data.subscription.endsAt)}` : "Hakuna tarehe ya mwisho"}</p></div><form className="mt-4 space-y-3" onSubmit={(event) => { event.preventDefault(); void submitForm("subscription", event.currentTarget, startSubscriptionPaymentAction); }}><Select label="Kifurushi (mwezi mmoja)" name="plan" defaultValue={data.subscription.plan}>{PLAN_IDS.map((id) => <option key={id} value={id}>{SUBSCRIPTION_PLANS[id].label} · {money(SUBSCRIPTION_PLANS[id].price)}</option>)}</Select><ul className="space-y-1.5 text-xs text-ink-3">{PLAN_IDS.map((id) => <li key={id}><span className="font-semibold text-ink-2">{SUBSCRIPTION_PLANS[id].label}:</span> {SUBSCRIPTION_PLANS[id].summary}</li>)}</ul><Input label="Namba ya simu ya malipo" name="namba_malipo" type="tel" placeholder="0712345678" required /><Button type="submit" loading={busy === "subscription"} disabled={!data.snippeConfigured} icon={<Smartphone />} className="w-full">Lipa kwa Snippe</Button></form></CardBody></Card>
-          <Card><CardHeader title="Historia ya Subscription" /><CardBody className="!p-0">{data.subscriptionPayments.length === 0 ? <Empty>Hakuna malipo ya subscription bado.</Empty> : <div className="divide-y divide-line">{data.subscriptionPayments.map((payment) => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div><p className="font-semibold text-ink">{SUBSCRIPTION_PLANS[payment.plan].label} · {payment.months === 12 ? "Mwaka mmoja" : "Mwezi mmoja"} · {money(payment.amount)}</p><p className="text-xs text-ink-3">{date(payment.createdAt)} · {payment.reference || "Haijapata reference"}</p></div><div className="flex items-center gap-2"><span className={`badge ${payment.status === "ACTIVE" ? "badge-done" : payment.status === "PENDING" ? "badge-wait" : "badge-danger"}`}>{payment.status}</span>{payment.status === "PENDING" && payment.reference && <Button size="sm" variant="outline" loading={busy === `sub-${payment.id}`} icon={<RefreshCw />} onClick={async () => { setBusy(`sub-${payment.id}`); const result = await checkSubscriptionPaymentAction(payment.id); setBusy(null); toast(result.message, result.success ? "success" : "error"); router.refresh(); }}>Kagua</Button>}</div></div>)}</div>}</CardBody></Card>
-        </div>
+        <SubscriptionPanel subscription={data.subscription} payments={data.subscriptionPayments} snippeConfigured={data.snippeConfigured} />
       )}
 
       {tab === "audit" && <Card><CardHeader title="Historia ya Shughuli" action={<span className="badge badge-info">{data.audits.length}</span>} /><CardBody className="!p-0">{data.audits.length === 0 ? <Empty>Audit log itaanza kuonekana baada ya shughuli mpya.</Empty> : <div className="divide-y divide-line">{data.audits.map((audit) => <div key={audit.id} className="grid gap-2 px-5 py-3 sm:grid-cols-[170px_1fr_auto] sm:items-center"><p className="text-sm font-semibold text-ink">{audit.actor}</p><div><p className="text-sm text-ink-2">{audit.action.replaceAll("_", " ")}</p><p className="text-xs text-ink-3">{audit.entity}</p></div><time className="text-xs text-ink-3">{date(audit.createdAt)}</time></div>)}</div>}</CardBody></Card>}

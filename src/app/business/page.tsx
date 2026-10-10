@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { businessIdFor, effectivePlan, getBusinessOwner, requireUser, subscriptionIsActive, subscriptionIsExempt } from "@/lib/auth";
+import { businessIdFor, effectivePlan, getBusinessOwner, requireUser, subscriptionDaysLeft, subscriptionIsActive, subscriptionIsExempt } from "@/lib/auth";
 import { planHasFeature, SUBSCRIPTION_PLANS } from "@/lib/plans";
 import { AppShell } from "@/components/layout/app-shell";
 import { BusinessView, type BusinessViewData } from "@/components/business/business-view";
@@ -23,7 +23,7 @@ export default async function BusinessPage({
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
-  const [products, sales, expenses, customers, cargos, staff, audits, subscriptionPayments] = await Promise.all([
+  const [products, sales, expenses, customers, staff, audits, subscriptionPayments] = await Promise.all([
     prisma.product.findMany({ where: { mtumiajiId: businessId, active: true }, orderBy: { jina: "asc" } }),
     prisma.sale.findMany({
       where: { mtumiajiId: businessId },
@@ -33,11 +33,6 @@ export default async function BusinessPage({
     }),
     prisma.expense.findMany({ where: { mtumiajiId: businessId }, orderBy: { tarehe: "desc" }, take: 80 }),
     prisma.customer.findMany({ where: { mtumiajiId: businessId, imezuiwa: false }, select: { id: true, jina: true, simu: true }, orderBy: { jina: "asc" } }),
-    prisma.cargo.findMany({
-      where: { mtumiajiId: businessId, hali: "Imefika", items: { some: { stockedAt: null } } },
-      include: { items: true },
-      orderBy: { tareheKuagiza: "desc" },
-    }),
     prisma.user.findMany({ where: { ownerId: businessId }, select: { id: true, jina: true, businessRole: true, isActive: true, tareheKuundwa: true }, orderBy: { tareheKuundwa: "asc" } }),
     prisma.auditLog.findMany({ where: { mtumiajiId: businessId }, include: { actor: { select: { jina: true } } }, orderBy: { tarehe: "desc" }, take: 60 }),
     prisma.subscriptionPayment.findMany({ where: { mtumiajiId: businessId }, orderBy: { tareheKuundwa: "desc" }, take: 8 }),
@@ -59,6 +54,7 @@ export default async function BusinessPage({
       plan,
       planLabel: SUBSCRIPTION_PLANS[plan].label,
       endsAt: owner.subscriptionEndsAt?.toISOString() ?? null,
+      daysLeft: subscriptionDaysLeft(owner),
     },
     features: {
       staff: planHasFeature(plan, "staff"),
@@ -100,13 +96,6 @@ export default async function BusinessPage({
     })),
     expenses: expenses.map((expense) => ({ id: expense.id, category: expense.aina, amount: Number(expense.kiasi), note: expense.maelezo, createdAt: expense.tarehe.toISOString() })),
     customers,
-    cargos: cargos.map((cargo) => ({
-      id: cargo.id,
-      supplier: cargo.jinaKampuni,
-      tracking: cargo.nambariTracking,
-      baseCost: Number(cargo.jumlaGharama),
-      items: cargo.items.filter((item) => !item.stockedAt).map((item) => ({ name: item.jinaBidhaa, quantity: item.idadi, total: Number(item.jumla) })),
-    })),
     staff: staff.map((member) => ({ id: member.id, name: member.jina, role: member.businessRole, active: member.isActive, createdAt: member.tareheKuundwa.toISOString() })),
     audits: !planHasFeature(plan, "audit") ? [] : audits.map((audit) => ({ id: audit.id, actor: audit.actor?.jina ?? "Mfumo", action: audit.action, entity: audit.entity, details: audit.details, createdAt: audit.tarehe.toISOString() })),
     subscriptionPayments: subscriptionPayments.map((payment) => ({ id: payment.id, amount: payment.kiasi, months: payment.miezi, plan: payment.plan, status: payment.status, paymentStatus: payment.paymentStatus, reference: payment.paymentReference, createdAt: payment.tareheKuundwa.toISOString() })),
