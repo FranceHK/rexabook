@@ -54,16 +54,17 @@ const PLAN_POINTS: Record<PlanId, Array<{ label: string; included: boolean }>> =
 };
 
 /** What the guards in lib/auth and the server actions actually refuse once the subscription lapses. */
-export const EXPIRED_LOCKED = [
+const EXPIRED_LOCKED = [
   "Dashibodi haifunguki",
   "Wadaiwa: kuona wateja, kuongeza madeni, kupokea malipo na kutuma vikumbusho",
   "Kurekodi mauzo mapya na kutoa risiti",
   "Kuongeza bidhaa na kurekebisha stock",
   "Kurekodi matumizi",
   "Mizigo: kuona na kuongeza",
+  "Kupakua backup ya data",
 ];
 
-export const EXPIRED_ALLOWED = [
+const EXPIRED_ALLOWED = [
   "Kuingia na kufungua ukurasa wa Biashara",
   "Kuona (bila kubadilisha) bidhaa, mauzo na matumizi ya zamani",
   "Kulipia subscription",
@@ -73,7 +74,7 @@ export const EXPIRED_ALLOWED = [
 const money = (value: number) => `TZS ${Math.round(value).toLocaleString("en-TZ")}`;
 const date = (value: string) => new Date(value).toLocaleDateString("sw-TZ", { day: "2-digit", month: "short", year: "numeric" });
 
-export function ExpiredNotice({ owner }: { owner: boolean }) {
+function ExpiredNotice() {
   return (
     <div className="rounded-lg border border-danger/25 bg-danger/5 p-5">
       <div className="flex items-start gap-3">
@@ -81,7 +82,7 @@ export function ExpiredNotice({ owner }: { owner: boolean }) {
         <div>
           <p className="font-semibold text-ink">Subscription imeisha</p>
           <p className="mt-1 text-sm text-ink-2">
-            {owner ? "Lipia kifurushi ili kufungua mfumo wote. Data yako iko salama, haijafutwa." : "Mwambie mmiliki wa duka alipie ili muendelee. Data ya duka iko salama."}
+            Lipia kifurushi ili kufungua mfumo wote. Data yako iko salama, haijafutwa.
           </p>
         </div>
       </div>
@@ -176,7 +177,7 @@ export function SubscriptionPanel({
         </div>
       </section>
 
-      {!subscription.active && <ExpiredNotice owner />}
+      {!subscription.active && <ExpiredNotice />}
 
       <form
         onSubmit={(event) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -9,11 +9,8 @@ import {
   CheckCircle2,
   ClipboardList,
   Download,
-  FileText,
-  MessageCircle,
   PackageCheck,
   Plus,
-  ReceiptText,
   ShoppingCart,
   Smartphone,
   TrendingUp,
@@ -21,10 +18,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import {
-  adjustProductStockAction,
   createExpenseAction,
-  createProductAction,
-  createSaleAction,
   createStaffAction,
   toggleStaffAction,
 } from "@/actions/business";
@@ -33,10 +27,11 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/theme/toast-provider";
-import { ExpiredNotice, SubscriptionPanel } from "@/components/business/subscription-panel";
+import { ProductsPanel } from "@/components/business/products-panel";
+import { SalesPanel } from "@/components/business/sales-panel";
+import { SubscriptionPanel } from "@/components/business/subscription-panel";
 
 type BusinessRole = "OWNER" | "MANAGER" | "CASHIER";
-type PaymentMethod = "CASH" | "MOBILE_MONEY" | "BANK" | "CREDIT";
 type PlanId = "BASIC" | "FULL";
 type TabId = "overview" | "sales" | "products" | "expenses" | "team" | "subscription" | "audit";
 
@@ -48,7 +43,7 @@ export interface BusinessViewData {
   upgradeNotice: boolean;
   stats: { revenue: number; grossProfit: number; expenses: number; netProfit: number; stockValue: number; lowStock: number };
   products: Array<{ id: number; name: string; sku: string; unit: string; buyingPrice: number; sellingPrice: number; stock: number; lowStockAt: number }>;
-  sales: Array<{ id: number; receiptNumber: string; customerName: string | null; customerPhone: string | null; servedBy: string | null; paymentMethod: PaymentMethod; total: number; paidAmount: number; profit: number; createdAt: string; items: Array<{ name: string; quantity: number; unitPrice: number; total: number }> }>;
+  sales: Array<{ id: number; receiptNumber: string; customerName: string | null; customerPhone: string | null; servedBy: string | null; paymentMethod: string; total: number; paidAmount: number; profit: number; createdAt: string; items: Array<{ name: string; quantity: number; unitPrice: number; total: number }> }>;
   expenses: Array<{ id: number; category: string; amount: number; note: string | null; createdAt: string }>;
   customers: Array<{ id: number; jina: string; simu: string | null }>;
   staff: Array<{ id: number; name: string; role: BusinessRole; active: boolean; createdAt: string }>;
@@ -79,12 +74,6 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
   // An owner whose subscription lapsed lands straight on the place to fix it.
   const [tab, setTab] = useState<TabId>(!data.subscription.active && data.role === "OWNER" ? "subscription" : "overview");
   const [busy, setBusy] = useState<string | null>(null);
-  const [saleProductId, setSaleProductId] = useState(data.products[0]?.id ?? 0);
-  const [saleQuantity, setSaleQuantity] = useState(1);
-  const [cart, setCart] = useState<Array<{ productId: number; quantity: number }>>([]);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
-  const [customerId, setCustomerId] = useState(0);
-  const [paidAmount, setPaidAmount] = useState(0);
 
   const lockedTabs: Partial<Record<TabId, boolean>> = {
     subscription: data.subscription.exempt,
@@ -92,25 +81,6 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
     audit: !data.features.audit,
   };
   const availableTabs = tabOptions.filter((option) => option.roles.includes(data.role) && !lockedTabs[option.id]);
-  const cartRows = useMemo(() => cart.map((item) => ({ ...item, product: data.products.find((product) => product.id === item.productId)! })).filter((item) => item.product), [cart, data.products]);
-  const cartTotal = cartRows.reduce((sum, item) => sum + item.product.sellingPrice * item.quantity, 0);
-
-  function addCartItem() {
-    const product = data.products.find((item) => item.id === saleProductId);
-    if (!product || saleQuantity < 1) return;
-    setCart((current) => {
-      const existing = current.find((item) => item.productId === product.id);
-      const nextQuantity = (existing?.quantity ?? 0) + saleQuantity;
-      if (nextQuantity > product.stock) {
-        toast(`Stock ya ${product.name} haitoshi.`, "error");
-        return current;
-      }
-      return existing
-        ? current.map((item) => item.productId === product.id ? { ...item, quantity: nextQuantity } : item)
-        : [...current, { productId: product.id, quantity: saleQuantity }];
-    });
-    setSaleQuantity(1);
-  }
 
   async function submitForm(key: string, form: HTMLFormElement, action: (prev: null, formData: FormData) => Promise<{ success: boolean; message: string }>) {
     setBusy(key);
@@ -121,35 +91,6 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
       form.reset();
       router.refresh();
     }
-  }
-
-  async function saveSale() {
-    setBusy("sale");
-    const result = await createSaleAction({
-      customerId: customerId || null,
-      paymentMethod,
-      paidAmount,
-      items: cart,
-    });
-    setBusy(null);
-    toast(result.message, result.success ? "success" : "error");
-    if (result.success) {
-      setCart([]);
-      setPaidAmount(0);
-      router.refresh();
-      if (result.id) window.open(`/api/sales/${result.id}/receipt`, "_blank", "noopener,noreferrer");
-    }
-  }
-
-  async function adjustStock(productId: number, current: number) {
-    const raw = window.prompt(`Stock ya sasa ni ${current}. Weka idadi ya kuongeza au kutoa, mfano 5 au -2:`);
-    if (!raw) return;
-    const delta = Number(raw);
-    setBusy(`stock-${productId}`);
-    const result = await adjustProductStockAction(productId, delta);
-    setBusy(null);
-    toast(result.message, result.success ? "success" : "error");
-    if (result.success) router.refresh();
   }
 
   const subscriptionBadge = data.subscription.active ? "badge-done" : "badge-danger";
@@ -163,10 +104,9 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
         </div>
         <div className="flex items-center gap-2">
           <span className={`badge ${subscriptionBadge}`}>{data.subscription.exempt ? "Admin · hakuna malipo" : !data.subscription.active ? "Subscription imeisha" : data.subscription.trial ? "Majaribio" : `Kifurushi: ${data.subscription.planLabel}`}</span>
-          {data.role === "OWNER" && data.features.backup && <a href="/api/backup" className="btn btn-outline btn-sm"><Download className="size-4" /> Backup</a>}
+          {data.role === "OWNER" && data.features.backup && data.subscription.active && <a href="/api/backup" className="btn btn-outline btn-sm"><Download className="size-4" /> Backup</a>}
         </div>
       </header>
-      {!data.subscription.active && tab !== "subscription" && <div className="mb-5"><ExpiredNotice owner={data.role === "OWNER"} /></div>}
       {data.upgradeNotice && !data.features.cargo && <p className="mb-5 rounded-lg bg-warning/10 px-4 py-3 text-sm text-ink-2">Sehemu hiyo inapatikana kwenye kifurushi cha Kamili. {data.role === "OWNER" ? "Pandisha kifurushi kwenye tab ya Subscription." : "Mwambie mmiliki apandishe kifurushi."}</p>}
 
       <div className="mb-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Sehemu za biashara">
@@ -201,66 +141,16 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
         </div>
       )}
 
-      {tab === "products" && (
-        <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
-          <Card><CardHeader title="Ongeza Bidhaa" /><CardBody><form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void submitForm("product", event.currentTarget, createProductAction); }}>
-            <Input label="Jina la bidhaa" name="jina" required />
-            <div className="grid grid-cols-2 gap-3"><Input label="SKU" name="sku" placeholder="MF-001" required /><Input label="Kitengo" name="kitengo" defaultValue="pc" required /></div>
-            <div className="grid grid-cols-2 gap-3"><Input label="Bei ya kununua" name="bei_kununua" type="number" min="0" defaultValue="0" required /><Input label="Bei ya kuuza" name="bei_kuuza" type="number" min="0" defaultValue="0" required /></div>
-            <div className="grid grid-cols-2 gap-3"><Input label="Stock ya kuanzia" name="stock" type="number" min="0" defaultValue="0" required /><Input label="Tahadhari ikifika" name="stock_tahadhari" type="number" min="0" defaultValue="5" required /></div>
-            <Button type="submit" loading={busy === "product"} icon={<Plus />} className="w-full">Ongeza Bidhaa</Button>
-          </form></CardBody></Card>
-          <Card><CardHeader title="Bidhaa na Stock" action={<span className="badge badge-info">{data.products.length} bidhaa</span>} /><CardBody className="!p-0"><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="border-b border-line bg-surface-2 text-xs uppercase text-ink-3"><tr><th className="px-5 py-3">Bidhaa</th><th className="px-4 py-3">Bei Nunua</th><th className="px-4 py-3">Bei Uza</th><th className="px-4 py-3">Stock</th><th className="px-5 py-3 text-right">Hatua</th></tr></thead><tbody className="divide-y divide-line">{data.products.map((product) => <tr key={product.id}><td className="px-5 py-3"><p className="font-semibold text-ink">{product.name}</p><p className="text-xs text-ink-3">{product.sku} · {product.unit}</p></td><td className="px-4 py-3">{money(product.buyingPrice)}</td><td className="px-4 py-3">{money(product.sellingPrice)}</td><td className="px-4 py-3"><span className={`badge ${product.stock <= product.lowStockAt ? "badge-danger" : "badge-done"}`}>{product.stock}</span></td><td className="px-5 py-3 text-right"><Button size="sm" variant="outline" loading={busy === `stock-${product.id}`} onClick={() => adjustStock(product.id, product.stock)}>Rekebisha</Button></td></tr>)}</tbody></table>{data.products.length === 0 && <Empty>Ongeza bidhaa yako ya kwanza.</Empty>}</div></CardBody></Card>
-        </div>
-      )}
+      {tab === "products" && <ProductsPanel products={data.products} locked={!data.subscription.active} />}
 
       {tab === "sales" && (
-        <div className="grid gap-5 xl:grid-cols-[420px_1fr]">
-          <Card><CardHeader title="Mauzo Mapya" /><CardBody className="space-y-4">
-            {!data.subscription.active && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">Subscription imeisha. Owner anatakiwa kulipia kwanza.</p>}
-            <div className="grid grid-cols-[1fr_90px] gap-2"><Select label="Bidhaa" value={saleProductId} onChange={(e) => setSaleProductId(Number(e.target.value))}><option value={0}>Chagua bidhaa</option>{data.products.filter((p) => p.stock > 0).map((product) => <option key={product.id} value={product.id}>{product.name} ({product.stock})</option>)}</Select><Input label="Idadi" type="number" min="1" value={saleQuantity} onChange={(e) => setSaleQuantity(Number(e.target.value))} /></div>
-            <Button variant="outline" onClick={addCartItem} icon={<Plus />} className="w-full">Ongeza kwenye mauzo</Button>
-            <div className="divide-y divide-line rounded-lg border border-line">{cartRows.length === 0 ? <p className="p-4 text-center text-sm text-ink-3">Hakuna bidhaa zilizochaguliwa.</p> : cartRows.map((item) => <div key={item.productId} className="flex items-center justify-between gap-3 px-3 py-2"><div><p className="text-sm font-semibold text-ink">{item.product.name}</p><p className="text-xs text-ink-3">{item.quantity} × {money(item.product.sellingPrice)}</p></div><button className="text-xs font-semibold text-danger" onClick={() => setCart((c) => c.filter((row) => row.productId !== item.productId))}>Ondoa</button></div>)}</div>
-            <div className="flex justify-between rounded-lg bg-surface-2 px-4 py-3"><span className="text-sm text-ink-3">Jumla</span><strong className="text-ink">{money(cartTotal)}</strong></div>
-            <Select label="Njia ya malipo" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}><option value="CASH">Cash</option><option value="MOBILE_MONEY">Mobile Money</option><option value="BANK">Benki</option><option value="CREDIT">Mkopo</option></Select>
-            <Select label={paymentMethod === "CREDIT" ? "Mteja wa mkopo" : "Mteja (hiari)"} value={customerId} onChange={(e) => setCustomerId(Number(e.target.value))}><option value={0}>Mteja wa kawaida</option>{data.customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.jina}</option>)}</Select>
-            {paymentMethod === "CREDIT" && <Input label="Kiasi kilicholipwa sasa" type="number" min="0" max={cartTotal} value={paidAmount} onChange={(e) => setPaidAmount(Number(e.target.value))} />}
-            <Button onClick={() => void saveSale()} loading={busy === "sale"} disabled={!data.subscription.active || cart.length === 0} icon={<ReceiptText />} className="w-full">Kamilisha na Toa Risiti</Button>
-          </CardBody></Card>
-          <Card>
-            <CardHeader title="Historia ya Mauzo" action={<span className="badge badge-info">{data.sales.length}</span>} />
-            <CardBody className="!p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="border-b border-line bg-surface-2 text-xs uppercase text-ink-3">
-                    <tr><th className="px-5 py-3">Risiti</th><th className="px-4 py-3">Mteja</th><th className="px-4 py-3">Malipo</th><th className="px-4 py-3">Jumla</th><th className="px-5 py-3 text-right">Risiti</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {data.sales.map((sale) => {
-                      const message = encodeURIComponent(`Habari ${sale.customerName || "mteja"}, risiti ${sale.receiptNumber}. Jumla ${money(sale.total)}. Asante.`);
-                      const whatsappNumber = sale.customerPhone?.replace(/\D/g, "") || "";
-                      return (
-                        <tr key={sale.id}>
-                          <td className="px-5 py-3"><p className="font-semibold text-ink">{sale.receiptNumber}</p><p className="text-xs text-ink-3">{date(sale.createdAt)} · {sale.servedBy || "Mfumo"}</p></td>
-                          <td className="px-4 py-3">{sale.customerName || "Kawaida"}</td>
-                          <td className="px-4 py-3"><span className="badge badge-info">{sale.paymentMethod.replace("_", " ")}</span></td>
-                          <td className="px-4 py-3 font-semibold">{money(sale.total)}</td>
-                          <td className="px-5 py-3">
-                            <div className="flex justify-end gap-2">
-                              <a className="btn btn-outline btn-sm" href={`/api/sales/${sale.id}/receipt`} target="_blank" rel="noreferrer"><FileText className="size-4" /> PDF</a>
-                              <a className="btn btn-success btn-sm" href={`https://wa.me/${whatsappNumber}?text=${message}`} target="_blank" rel="noreferrer"><MessageCircle className="size-4" /> WhatsApp</a>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {data.sales.length === 0 && <Empty>Hakuna mauzo bado.</Empty>}
-              </div>
-            </CardBody>
-          </Card>
-        </div>
+        <SalesPanel
+          products={data.products}
+          customers={data.customers}
+          sales={data.sales}
+          locked={!data.subscription.active}
+          onPay={data.role === "OWNER" && !data.subscription.exempt ? () => setTab("subscription") : undefined}
+        />
       )}
 
       {tab === "expenses" && (

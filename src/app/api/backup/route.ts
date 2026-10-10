@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { businessIdFor, getBusinessOwner, getCurrentUser, planAllows } from "@/lib/auth";
+import { businessIdFor, getBusinessOwner, getCurrentUser, planAllows, subscriptionIsActive } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ export async function GET() {
   if (user.businessRole !== "OWNER") return NextResponse.json({ error: "Owner pekee anaweza kupakua backup." }, { status: 403 });
   const businessOwner = await getBusinessOwner(user);
   if (!businessOwner || !planAllows(businessOwner, "backup")) return NextResponse.json({ error: "Backup inapatikana kwenye kifurushi cha Kamili." }, { status: 403 });
+  if (!subscriptionIsActive(businessOwner)) return NextResponse.json({ error: "Subscription imeisha. Lipia ili kupakua backup." }, { status: 403 });
   const businessId = businessIdFor(user);
   const [owner, customers, debts, cargos, products, movements, sales, expenses, staff, audits, subscriptions] = await Promise.all([
     prisma.user.findUnique({ where: { id: businessId }, select: { id: true, jina: true, jina_duka: true, simu: true, tareheKuundwa: true } }),

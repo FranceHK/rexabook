@@ -39,6 +39,26 @@ async function activeBusinessContext(roles: BusinessRole[]) {
   return { user, businessId, owner, active: true as const };
 }
 
+/** SKU prefix from the product name: "Sukari 1kg" becomes "SUK". */
+function skuPrefix(name: string): string {
+  const letters = name.normalize("NFD").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return (letters.slice(0, 3) || "BID").padEnd(3, "X");
+}
+
+/** Next free code for that prefix within one business, e.g. SUK-001, SUK-002. */
+async function nextSku(businessId: number, name: string, skip: number): Promise<string> {
+  const prefix = skuPrefix(name);
+  const existing = await prisma.product.findMany({
+    where: { mtumiajiId: businessId, sku: { startsWith: `${prefix}-` } },
+    select: { sku: true },
+  });
+  const highest = existing.reduce((max, product) => {
+    const number = Number(product.sku.slice(prefix.length + 1));
+    return Number.isSafeInteger(number) && number > max ? number : max;
+  }, 0);
+  return `${prefix}-${String(highest + 1 + skip).padStart(3, "0")}`;
+}
+
 export async function createProductAction(
   _prev: ActionResult | null,
   formData: FormData
@@ -47,7 +67,6 @@ export async function createProductAction(
   if (!context.active) return fail("Subscription imeisha. Lipia ili kuongeza bidhaa.");
 
   const name = String(formData.get("jina") ?? "").trim();
-  const sku = String(formData.get("sku") ?? "").trim().toUpperCase();
   const unit = String(formData.get("kitengo") ?? "pc").trim();
   const buyingPrice = Number(formData.get("bei_kununua"));
   const sellingPrice = Number(formData.get("bei_kuuza"));
@@ -55,46 +74,76 @@ export async function createProductAction(
   const lowStockAt = Number(formData.get("stock_tahadhari"));
 
   if (!name || name.length > 150) return fail("Weka jina sahihi la bidhaa.");
-  if (!sku || sku.length > 60) return fail("Weka SKU fupi na sahihi.");
   if (!unit || unit.length > 30) return fail("Weka kitengo sahihi.");
   if (![buyingPrice, sellingPrice].every((value) => Number.isFinite(value) && value >= 0)) return fail("Bei za bidhaa si sahihi.");
   if (![openingStock, lowStockAt].every((value) => Number.isSafeInteger(value) && value >= 0)) return fail("Idadi ya stock si sahihi.");
 
-  try {
-    const product = await prisma.$transaction(async (tx) => {
-      const created = await tx.product.create({
-        data: {
-          mtumiajiId: context.businessId,
-          jina: name,
-          sku,
-          kitengo: unit,
-          beiKununua: buyingPrice,
-          beiKuuza: sellingPrice,
-          stock: openingStock,
-          stockTahadhari: lowStockAt,
-        },
-      });
-      if (openingStock > 0) {
-        await tx.stockMovement.create({
+  // Two people adding the same kind of product at once can draw the same code; retry with the next one.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const sku = await nextSku(context.businessId, name, attempt);
+    try {
+      const product = await prisma.$transaction(async (tx) => {
+        const created = await tx.product.create({
           data: {
             mtumiajiId: context.businessId,
-            productId: created.id,
-            aina: "OPENING",
-            idadi: openingStock,
-            stockBaada: openingStock,
-            maelezo: "Stock ya kuanzia",
+            jina: name,
+            sku,
+            kitengo: unit,
+            beiKununua: buyingPrice,
+            beiKuuza: sellingPrice,
+            stock: openingStock,
+            stockTahadhari: lowStockAt,
           },
         });
-      }
-      return created;
-    });
-    await writeAudit({ businessId: context.businessId, actorUserId: context.user.id, action: "PRODUCT_CREATED", entity: "Product", entityId: product.id, details: { name, sku, openingStock } });
-    refreshBusiness();
-    return { success: true, message: `Bidhaa “${name}” imeongezwa.`, id: product.id };
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return fail("SKU hiyo tayari inatumika.");
-    return fail("Imeshindikana kuongeza bidhaa.");
+        if (openingStock > 0) {
+          await tx.stockMovement.create({
+            data: {
+              mtumiajiId: context.businessId,
+              productId: created.id,
+              aina: "OPENING",
+              idadi: openingStock,
+              stockBaada: openingStock,
+              maelezo: "Stock ya kuanzia",
+            },
+          });
+        }
+        return created;
+      });
+      await writeAudit({ businessId: context.businessId, actorUserId: context.user.id, action: "PRODUCT_CREATED", entity: "Product", entityId: product.id, details: { name, sku, openingStock } });
+      refreshBusiness();
+      return { success: true, message: `Bidhaa “${name}” imeongezwa (SKU ${sku}).`, id: product.id };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") continue;
+      break;
+    }
   }
+  return fail("Imeshindikana kuongeza bidhaa.");
+}
+
+/** Edits a product's details. Stock is deliberately untouched: it only moves through adjustProductStockAction and sales. */
+export async function updateProductAction(productId: number, formData: FormData): Promise<ActionResult> {
+  const context = await activeBusinessContext(["OWNER", "MANAGER"]);
+  if (!context.active) return fail("Subscription imeisha. Lipia ili kuhariri bidhaa.");
+
+  const name = String(formData.get("jina") ?? "").trim();
+  const unit = String(formData.get("kitengo") ?? "").trim();
+  const buyingPrice = Number(formData.get("bei_kununua"));
+  const sellingPrice = Number(formData.get("bei_kuuza"));
+  const lowStockAt = Number(formData.get("stock_tahadhari"));
+  if (!Number.isSafeInteger(productId)) return fail("Bidhaa haipatikani.");
+  if (!name || name.length > 150) return fail("Weka jina sahihi la bidhaa.");
+  if (!unit || unit.length > 30) return fail("Weka kitengo sahihi.");
+  if (![buyingPrice, sellingPrice].every((value) => Number.isFinite(value) && value >= 0)) return fail("Bei za bidhaa si sahihi.");
+  if (!Number.isSafeInteger(lowStockAt) || lowStockAt < 0) return fail("Kiwango cha tahadhari si sahihi.");
+
+  const updated = await prisma.product.updateMany({
+    where: { id: productId, mtumiajiId: context.businessId },
+    data: { jina: name, kitengo: unit, beiKununua: buyingPrice, beiKuuza: sellingPrice, stockTahadhari: lowStockAt },
+  });
+  if (updated.count === 0) return fail("Bidhaa haipatikani.");
+  await writeAudit({ businessId: context.businessId, actorUserId: context.user.id, action: "PRODUCT_UPDATED", entity: "Product", entityId: productId, details: { name, unit, buyingPrice, sellingPrice, lowStockAt } });
+  refreshBusiness();
+  return { success: true, message: `Bidhaa “${name}” imehifadhiwa.` };
 }
 
 export async function adjustProductStockAction(productId: number, delta: number, note?: string): Promise<ActionResult> {
