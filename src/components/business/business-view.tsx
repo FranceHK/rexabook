@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Activity,
   Boxes,
@@ -10,26 +9,18 @@ import {
   ClipboardList,
   Download,
   PackageCheck,
-  Plus,
   ShoppingCart,
   Smartphone,
   TrendingUp,
   UserRoundCog,
   WalletCards,
 } from "lucide-react";
-import {
-  createStaffAction,
-  toggleStaffAction,
-} from "@/actions/business";
-import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { useToast } from "@/components/theme/toast-provider";
 import { ExpensesPanel } from "@/components/business/expenses-panel";
 import { ProductsPanel } from "@/components/business/products-panel";
 import { SalesPanel } from "@/components/business/sales-panel";
 import { SubscriptionPanel } from "@/components/business/subscription-panel";
+import { TeamPanel } from "@/components/business/team-panel";
 
 type BusinessRole = "OWNER" | "MANAGER" | "CASHIER";
 type PlanId = "BASIC" | "FULL";
@@ -69,11 +60,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 export function BusinessView({ data }: { data: BusinessViewData }) {
-  const router = useRouter();
-  const { toast } = useToast();
   // Anyone in the shop may pay, so a lapsed subscription opens straight on the place to fix it.
   const [tab, setTab] = useState<TabId>(!data.subscription.active ? "subscription" : "overview");
-  const [busy, setBusy] = useState<string | null>(null);
 
   const lockedTabs: Partial<Record<TabId, boolean>> = {
     subscription: data.subscription.exempt,
@@ -81,17 +69,6 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
     audit: !data.features.audit,
   };
   const availableTabs = tabOptions.filter((option) => option.roles.includes(data.role) && !lockedTabs[option.id]);
-
-  async function submitForm(key: string, form: HTMLFormElement, action: (prev: null, formData: FormData) => Promise<{ success: boolean; message: string }>) {
-    setBusy(key);
-    const result = await action(null, new FormData(form));
-    setBusy(null);
-    toast(result.message, result.success ? "success" : "error");
-    if (result.success) {
-      form.reset();
-      router.refresh();
-    }
-  }
 
   const subscriptionBadge = data.subscription.active ? "badge-done" : "badge-danger";
 
@@ -155,12 +132,7 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
 
       {tab === "expenses" && <ExpensesPanel expenses={data.expenses} monthTotal={data.stats.expenses} locked={!data.subscription.active} />}
 
-      {tab === "team" && (
-        <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
-          <Card><CardHeader title="Ongeza Mfanyakazi" /><CardBody><form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void submitForm("staff", event.currentTarget, createStaffAction); }}><Input label="Jina la kuingia" name="jina" required /><Input label="Nenosiri la kuanzia" name="nenosiri" type="password" minLength={6} required /><Select label="Nafasi" name="business_role" required><option value="MANAGER">Meneja</option><option value="CASHIER">Cashier</option></Select><Button type="submit" loading={busy === "staff"} icon={<Plus />} className="w-full">Ongeza Mfanyakazi</Button></form></CardBody></Card>
-          <Card><CardHeader title="Timu ya Duka" action={<span className="badge badge-info">{data.staff.length}</span>} /><CardBody className="!p-0">{data.staff.length === 0 ? <Empty>Hakuna mfanyakazi aliyeongezwa.</Empty> : <div className="divide-y divide-line">{data.staff.map((member) => <div key={member.id} className="flex items-center justify-between gap-4 px-5 py-4"><div><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-3">{member.role === "MANAGER" ? "Meneja" : "Cashier"} · ameongezwa {date(member.createdAt)}</p></div><Button size="sm" variant={member.active ? "outline" : "success"} loading={busy === `staff-${member.id}`} onClick={async () => { setBusy(`staff-${member.id}`); const result = await toggleStaffAction(member.id); setBusy(null); toast(result.message, result.success ? "success" : "error"); if (result.success) router.refresh(); }}>{member.active ? "Zuia" : "Ruhusu"}</Button></div>)}</div>}</CardBody></Card>
-        </div>
-      )}
+      {tab === "team" && <TeamPanel staff={data.staff} />}
 
       {tab === "subscription" && !data.subscription.exempt && (
         <SubscriptionPanel subscription={data.subscription} payments={data.subscriptionPayments} snippeConfigured={data.snippeConfigured} />
