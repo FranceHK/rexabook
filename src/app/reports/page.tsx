@@ -101,7 +101,7 @@ export default async function ReportsPage({
               <Lock className="mt-0.5 size-4 shrink-0 text-warning" />
               Subscription imeisha. Unaweza kuona ripoti zote hapa, lakini kupakua PDF, Excel au kuchapisha kumefungwa hadi ulipie.
             </p>
-            {user.businessRole === "OWNER" && <Link href="/business" className="btn btn-primary btn-sm">Lipia sasa</Link>}
+            <Link href="/business" className="btn btn-primary btn-sm">Lipia sasa</Link>
           </div>
         )}
 

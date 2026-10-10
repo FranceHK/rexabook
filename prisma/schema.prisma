@@ -116,6 +116,10 @@ model User {
   referralCode       String?            @unique @db.VarChar(20)
   referredById       Int?
   mustChangePassword Boolean            @default(false)
+  jinaKamili         String?            @db.VarChar(150)
+  email              String?            @db.VarChar(150)
+  mkoa               String?            @db.VarChar(60)
+  tempPassword       String?            @db.VarChar(40)
   tareheKuundwa      DateTime           @default(now())
 
   owner                User?                 @relation("BusinessStaff", fields: [ownerId], references: [id], onDelete: Cascade)
@@ -363,6 +367,8 @@ model Sale {
   gharama           Decimal           @default(0) @db.Decimal(12, 2)
   faida             Decimal           @default(0) @db.Decimal(12, 2)
   kiasiKilicholipwa Decimal           @default(0) @db.Decimal(12, 2)
+  jinaMteja         String?           @db.VarChar(100)
+  kumbukumbuMalipo  String?           @db.VarChar(120)
   maelezo           String?           @db.Text
   tarehe            DateTime          @default(now())
 
@@ -371,6 +377,7 @@ model Sale {
   servedBy User?      @relation("SaleActor", fields: [servedById], references: [id], onDelete: SetNull)
   items    SaleItem[]
 
+  @@unique([mtumiajiId, kumbukumbuMalipo])
   @@index([mtumiajiId])
   @@index([customerId])
   @@index([tarehe])

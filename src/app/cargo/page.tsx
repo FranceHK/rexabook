@@ -47,7 +47,7 @@ export default async function CargoPage({
 
   return (
     <AppShell user={{ jina: user.jina, jinaDuka: user.jina_duka, isAdmin: user.role === "ADMIN", businessRole: user.businessRole }}>
-      <CargoView cargos={data} clientNewOpen={params.new === "1"} />
+      <CargoView cargos={data} clientNewOpen={params.new === "1"} canDelete={user.businessRole === "OWNER"} />
     </AppShell>
   );
 }

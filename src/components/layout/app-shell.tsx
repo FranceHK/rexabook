@@ -18,7 +18,6 @@ import {
   PanelLeftOpen,
   ShieldCheck,
   BriefcaseBusiness,
-  CreditCard,
   Handshake,
   BarChart3,
 } from "lucide-react";
@@ -52,9 +51,7 @@ const nav: NavItem[] = [
   { href: "/cargo", label: "Mizigo", icon: Package, accent: "text-success", roles: ["OWNER", "MANAGER"] },
   { href: "/reports", label: "Ripoti", icon: BarChart3, accent: "text-info", roles: ["OWNER", "MANAGER"] },
   { href: "/settings", label: "Mipangilio", icon: Settings, accent: "text-warning", roles: ["OWNER"] },
-  { href: "/admin/sms", label: "Admin SMS", icon: ShieldCheck, accent: "text-danger", adminOnly: true },
-  { href: "/admin/subscriptions", label: "Admin Malipo", icon: CreditCard, accent: "text-success", adminOnly: true },
-  { href: "/admin/sales", label: "Admin Sales", icon: Handshake, accent: "text-info", adminOnly: true },
+  { href: "/admin", label: "Admin", icon: ShieldCheck, accent: "text-danger", adminOnly: true },
   { href: "/sales", label: "Wateja Wangu", icon: Handshake, accent: "text-primary", salesOnly: true },
   { href: "/sales/settings", label: "Mipangilio", icon: Settings, accent: "text-warning", salesOnly: true },
 ];
@@ -143,45 +140,63 @@ function NavLinks({
   );
 }
 
-function LogoutBtn({
+/** Account card at the foot of the sidebar: who is signed in, plus theme and sign-out. */
+function AccountCard({
+  user,
   onLogout,
   theme,
   onToggleTheme,
   collapsed = false,
 }: {
+  user: AppUser;
   onLogout: () => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
   collapsed?: boolean;
 }) {
-  return (
-    <>
-      <div className="mb-3 flex items-center justify-center gap-1">
-        <button
-          type="button"
-          onClick={onToggleTheme}
-          className="grid size-9 place-items-center rounded-lg border border-line bg-surface text-ink-3 shadow-sm transition hover:border-primary/30 hover:text-primary"
-          aria-label={theme === "dark" ? "Badilisha kuwa mwangaza" : "Badilisha kuwa giza"}
-          title={theme === "dark" ? "Mwangaza" : "Giza"}
-        >
+  const role = user.isAdmin ? "Admin" : user.isSales ? "Sales" : user.businessRole === "MANAGER" ? "Meneja" : user.businessRole === "CASHIER" ? "Cashier" : "Mmiliki";
+  const themeLabel = theme === "dark" ? "Mwangaza" : "Giza";
+  const avatar = (
+    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-primary-2 text-sm font-bold text-white shadow-sm" title={collapsed ? user.jina : undefined}>
+      {initialsOf(user.jina)}
+    </span>
+  );
+  const iconButton = "grid size-9 place-items-center rounded-lg border border-line bg-surface text-ink-3 transition";
+
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        {avatar}
+        <button type="button" onClick={onToggleTheme} className={cn(iconButton, "hover:border-primary/30 hover:text-primary")} aria-label={themeLabel} title={themeLabel}>
           {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </button>
+        <button type="button" onClick={onLogout} className={cn(iconButton, "hover:border-danger/30 hover:bg-danger/10 hover:text-danger")} aria-label="Toka" title="Toka">
+          <LogOut className="size-4" />
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={onLogout}
-        title={collapsed ? "Toka" : undefined}
-        className={cn(
-          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-2 transition hover:bg-danger/10 hover:text-danger",
-          collapsed && "justify-center px-2"
-        )}
-      >
-        <span className="grid size-9 place-items-center rounded-lg bg-danger/10 text-danger ring-1 ring-danger/10">
-          <LogOut className="size-[18px]" />
-        </span>
-        {!collapsed && "Toka"}
-      </button>
-    </>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-line bg-surface-2 p-3">
+      <div className="flex items-center gap-3">
+        {avatar}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-ink" title={user.jina}>{user.jina}</p>
+          <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-ink-3">
+            <span className="size-1.5 rounded-full bg-success" aria-hidden /> {role}
+          </span>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={onToggleTheme} className="flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-2 py-2 text-xs font-medium text-ink-2 transition hover:border-primary/30 hover:text-primary">
+          {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />} {themeLabel}
+        </button>
+        <button type="button" onClick={onLogout} className="flex items-center justify-center gap-2 rounded-lg border border-line bg-surface px-2 py-2 text-xs font-medium text-ink-2 transition hover:border-danger/30 hover:bg-danger/10 hover:text-danger">
+          <LogOut className="size-4" /> Toka
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -227,17 +242,8 @@ function SidebarBody({
         <NavLinks pathname={pathname} onNavigate={onNavigate} collapsed={collapsed} isAdmin={user.isAdmin} isSales={user.isSales} businessRole={user.businessRole} />
       </div>
 
-      <div className="border-t border-line px-3 py-4">
-        <div className={cn("mb-3 flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2.5", collapsed && "justify-center px-2")}>
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-sm font-bold text-primary shadow-sm ring-1 ring-line">
-            {initialsOf(user.jina)}
-          </span>
-          <div className={cn("min-w-0 flex-1", collapsed && "hidden")}>
-            <p className="truncate text-sm font-medium text-ink">{user.jina}</p>
-            <p className="truncate text-xs text-ink-3">{user.isAdmin ? "Admin" : user.isSales ? "Sales" : "Mtumiaji"}</p>
-          </div>
-        </div>
-        <LogoutBtn onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} collapsed={collapsed} />
+      <div className={cn("border-t border-line px-3 py-4", collapsed && "px-2")}>
+        <AccountCard user={user} onLogout={onLogout} theme={theme} onToggleTheme={onToggleTheme} collapsed={collapsed} />
       </div>
     </div>
   );

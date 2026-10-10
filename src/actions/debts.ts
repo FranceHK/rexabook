@@ -84,6 +84,7 @@ export async function createDebtAction(
 /** Replicates deni_delete.php – deletes a debt and its payments. */
 export async function deleteDebtAction(deniId: number): Promise<ActionResult> {
   const user = await requireActiveBusinessUser();
+  if (user.businessRole !== "OWNER") return fail("Mmiliki pekee ndiye anaweza kufuta deni.");
   const businessId = businessIdFor(user);
 
   const deni = await prisma.debt.findFirst({

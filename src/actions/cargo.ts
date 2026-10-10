@@ -199,6 +199,7 @@ export async function markCargoItemArrivedAction(cargoItemId: number): Promise<A
 /** Replicates mzigo_delete.php – deletes a cargo order (and its items). */
 export async function deleteCargoAction(cargoId: number): Promise<ActionResult> {
   const user = await requireActiveBusinessRole(["OWNER", "MANAGER"], "cargo");
+  if (user.businessRole !== "OWNER") return fail("Mmiliki pekee ndiye anaweza kufuta mzigo.");
   const businessId = businessIdFor(user);
 
   const cargo = await prisma.cargo.findFirst({

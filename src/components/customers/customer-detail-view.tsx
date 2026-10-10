@@ -81,7 +81,7 @@ export interface CustomerDetailData {
   sms: DetailSms[];
 }
 
-export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
+export function CustomerDetailView({ data, canDelete }: { data: CustomerDetailData; canDelete: boolean }) {
   const { customer, debts, totals, counts, sms } = data;
   const { toast } = useToast();
   const router = useRouter();
@@ -338,7 +338,7 @@ export function CustomerDetailView({ data }: { data: CustomerDetailData }) {
                   </div>
                   <div className="flex items-center gap-2">
                     {d.imekamilika ? <Badge tone="done">Imelipwa</Badge> : <Badge tone="wait">Inadaiwa</Badge>}
-                    {d.kiasiKilicholipwa === 0 ? (
+                    {canDelete && d.kiasiKilicholipwa === 0 ? (
                       <Button variant="ghost" size="sm" className="!text-danger" onClick={() => futaDeni(d)} icon={<Trash2 />}>
                         Futa
                       </Button>

@@ -101,6 +101,11 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
+/** A sales person works only after giving their real names, email and region. */
+export function salesProfileComplete(user: Pick<User, "jinaKamili" | "email" | "mkoa">): boolean {
+  return Boolean(user.jinaKamili && user.email && user.mkoa);
+}
+
 /** Only sales people may open the referral/commission workspace. */
 export async function requireSales(): Promise<User> {
   const user = await getCurrentUser();

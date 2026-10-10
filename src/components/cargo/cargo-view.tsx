@@ -58,7 +58,7 @@ const USAFIRI_ICONS: Record<string, string> = {
 
 type Filter = "yote" | "Haijafika" | "Imefika";
 
-export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; clientNewOpen: boolean }) {
+export function CargoView({ cargos, clientNewOpen, canDelete }: { cargos: CargoClient[]; clientNewOpen: boolean; canDelete: boolean }) {
   const { toast } = useToast();
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("yote");
@@ -338,7 +338,7 @@ export function CargoView({ cargos, clientNewOpen }: { cargos: CargoClient[]; cl
 
                     <div className="flex-1" />
 
-                    {!imefika && (
+                    {!imefika && canDelete && (
                       <button
                         type="button"
                         onClick={() => futaMzigo(c)}

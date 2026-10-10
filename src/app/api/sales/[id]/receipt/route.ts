@@ -22,11 +22,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     shopName: sale.user.jina_duka,
     shopPhone: sale.user.simu,
     receiptNumber: sale.receiptNumber,
-    customerName: sale.customer?.jina,
+    customerName: sale.customer?.jina ?? sale.jinaMteja,
     customerPhone: sale.customer?.simu,
     date: sale.tarehe,
     servedBy: sale.servedBy?.jina,
     paymentMethod: sale.njiaMalipo,
+    paymentReference: sale.kumbukumbuMalipo,
     total: Number(sale.jumla),
     paid: Number(sale.kiasiKilicholipwa),
     items: sale.items.map((item) => ({

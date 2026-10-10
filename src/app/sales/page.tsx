@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CircleDollarSign, Clock3, Users, Wallet } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { requireSales, subscriptionIsActive } from "@/lib/auth";
+import { requireSales, salesProfileComplete, subscriptionIsActive } from "@/lib/auth";
 import { SALES_COMMISSION_PERCENT, SUBSCRIPTION_PLANS } from "@/lib/plans";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -15,7 +15,7 @@ const date = (value: Date) => value.toLocaleDateString("sw-TZ", { day: "2-digit"
 
 export default async function SalesPage() {
   const sales = await requireSales();
-  if (sales.mustChangePassword) redirect("/sales/settings");
+  if (!salesProfileComplete(sales)) redirect("/sales/settings");
   const [customers, commissions] = await Promise.all([
     prisma.user.findMany({
       where: { referredById: sales.id },

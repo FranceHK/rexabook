@@ -84,10 +84,11 @@ export default async function BusinessPage({
     sales: sales.map((sale) => ({
       id: sale.id,
       receiptNumber: sale.receiptNumber,
-      customerName: sale.customer?.jina ?? null,
+      customerName: sale.customer?.jina ?? sale.jinaMteja ?? null,
       customerPhone: sale.customer?.simu ?? null,
       servedBy: sale.servedBy?.jina ?? null,
       paymentMethod: sale.njiaMalipo,
+      paymentReference: sale.kumbukumbuMalipo,
       total: Number(sale.jumla),
       paidAmount: Number(sale.kiasiKilicholipwa),
       profit: Number(sale.faida),

@@ -19,6 +19,13 @@ export interface BusinessActionResult extends ActionResult {
 
 export interface SaleInput {
   customerId?: number | null;
+  /** Required when no registered customer is picked. */
+  customerName?: string;
+  /** Save the typed name as a new customer of the shop. */
+  registerCustomer?: boolean;
+  customerPhone?: string;
+  /** Mobile money transaction id; required for MOBILE_MONEY and unique per shop. */
+  paymentReference?: string;
   paymentMethod: SalePaymentMethod;
   paidAmount?: number;
   note?: string;
@@ -205,6 +212,16 @@ export async function createSaleAction(input: SaleInput): Promise<BusinessAction
     return fail("Kiasi kilicholipwa si sahihi.");
   }
 
+  const customerName = String(input.customerName ?? "").trim();
+  const customerPhone = String(input.customerPhone ?? "").trim();
+  if (!input.customerId && !customerName) return fail("Andika jina la mteja au mchague aliyesajiliwa.");
+  if (customerName.length > 100) return fail("Jina la mteja ni refu mno.");
+  if (customerPhone.length > 20) return fail("Namba ya simu ya mteja ni ndefu mno.");
+  const paymentReference = String(input.paymentReference ?? "").replace(/\s+/g, "").toUpperCase();
+  if (input.paymentMethod === "MOBILE_MONEY" && (paymentReference.length < 4 || paymentReference.length > 120)) {
+    return fail("Weka namba ya muamala wa simu.");
+  }
+
   const quantities = new Map<number, number>();
   for (const item of input.items) {
     if (!Number.isSafeInteger(item.productId) || !Number.isSafeInteger(item.quantity) || item.quantity <= 0) return fail("Idadi ya bidhaa si sahihi.");
@@ -216,10 +233,18 @@ export async function createSaleAction(input: SaleInput): Promise<BusinessAction
     const sale = await prisma.$transaction(async (tx) => {
       const products = await tx.product.findMany({ where: { id: { in: productIds }, mtumiajiId: context.businessId, active: true } });
       if (products.length !== productIds.length) throw new Error("PRODUCT_NOT_FOUND");
-      const customer = input.customerId
+      let customer = input.customerId
         ? await tx.customer.findFirst({ where: { id: input.customerId, mtumiajiId: context.businessId } })
         : null;
+      if (input.customerId && !customer) throw new Error("CUSTOMER_NOT_FOUND");
+      if (!customer && input.registerCustomer) {
+        customer = await tx.customer.create({ data: { mtumiajiId: context.businessId, jina: customerName, simu: customerPhone || null } });
+      }
       if (input.paymentMethod === "CREDIT" && !customer) throw new Error("CUSTOMER_REQUIRED");
+      if (input.paymentMethod === "MOBILE_MONEY") {
+        const used = await tx.sale.findFirst({ where: { mtumiajiId: context.businessId, kumbukumbuMalipo: paymentReference }, select: { receiptNumber: true } });
+        if (used) throw new Error(`REFERENCE_USED:${used.receiptNumber}`);
+      }
 
       let total = 0;
       let cost = 0;
@@ -244,6 +269,8 @@ export async function createSaleAction(input: SaleInput): Promise<BusinessAction
           gharama: cost,
           faida: total - cost,
           kiasiKilicholipwa: paidAmount,
+          jinaMteja: customer?.jina ?? customerName,
+          kumbukumbuMalipo: input.paymentMethod === "MOBILE_MONEY" ? paymentReference : null,
           maelezo: input.note?.trim() || null,
           items: {
             create: products.map((product) => {
@@ -312,7 +339,10 @@ export async function createSaleAction(input: SaleInput): Promise<BusinessAction
     refreshBusiness();
     return { success: true, message: `Mauzo ${sale.receiptNumber} yamehifadhiwa.`, id: sale.id };
   } catch (error) {
-    if (error instanceof Error && error.message === "CUSTOMER_REQUIRED") return fail("Chagua mteja kwa mauzo ya mkopo.");
+    if (error instanceof Error && error.message === "CUSTOMER_REQUIRED") return fail("Kwa mauzo ya mkopo, chagua mteja aliyesajiliwa au msajili sasa.");
+    if (error instanceof Error && error.message === "CUSTOMER_NOT_FOUND") return fail("Mteja uliyemchagua hapatikani.");
+    if (error instanceof Error && error.message.startsWith("REFERENCE_USED:")) return fail(`Namba hiyo ya muamala tayari imetumika kwenye risiti ${error.message.split(":")[1]}.`);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && String(error.meta?.target ?? "").includes("kumbukumbuMalipo")) return fail("Namba hiyo ya muamala tayari imetumika.");
     if (error instanceof Error && error.message.startsWith("LOW_STOCK:")) return fail(`Stock haitoshi kwa ${error.message.split(":")[1]}.`);
     return fail("Imeshindikana kuhifadhi mauzo. Kagua bidhaa na stock.");
   }
@@ -364,8 +394,11 @@ export async function startSubscriptionPaymentAction(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const user = await requireBusinessRole(["OWNER"]);
-  if (subscriptionIsExempt(user)) return fail("Akaunti ya admin hailipii subscription.");
+  // Any member of the shop may pay, so a cashier is never stuck waiting for the owner.
+  const user = await requireBusinessRole(["OWNER", "MANAGER", "CASHIER"]);
+  const owner = await getBusinessOwner(user);
+  if (!owner) return fail("Duka halipatikani.");
+  if (subscriptionIsExempt(owner)) return fail("Akaunti ya admin hailipii subscription.");
   if (!process.env.SNIPPE_API_KEY) return fail("Snippe haijaunganishwa.");
   const businessId = businessIdFor(user);
   const phone = normalizePhone(String(formData.get("namba_malipo") ?? "").trim());
@@ -411,7 +444,7 @@ export async function startSubscriptionPaymentAction(
 }
 
 export async function checkSubscriptionPaymentAction(paymentId: number): Promise<ActionResult> {
-  const user = await requireBusinessRole(["OWNER"]);
+  const user = await requireBusinessRole(["OWNER", "MANAGER", "CASHIER"]);
   const businessId = businessIdFor(user);
   const paymentRow = await prisma.subscriptionPayment.findFirst({ where: { id: paymentId, mtumiajiId: businessId } });
   if (!paymentRow?.paymentReference) return fail("Malipo hayana kumbukumbu ya Snippe.");

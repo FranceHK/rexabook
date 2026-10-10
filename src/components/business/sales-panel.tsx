@@ -2,13 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, FileText, HandCoins, Landmark, Lock, MessageCircle, Minus, PackageSearch, Plus, ReceiptText, Search, ShoppingCart, Smartphone, Trash2 } from "lucide-react";
+import { Banknote, BadgeCheck, FileText, HandCoins, Landmark, Lock, MessageCircle, Minus, PackageSearch, Plus, ReceiptText, Search, ShoppingCart, Smartphone, Trash2, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { createSaleAction } from "@/actions/business";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/theme/toast-provider";
 
 type PaymentMethod = "CASH" | "MOBILE_MONEY" | "BANK" | "CREDIT";
@@ -29,6 +28,7 @@ export interface SalesPanelSale {
   customerPhone: string | null;
   servedBy: string | null;
   paymentMethod: string;
+  paymentReference: string | null;
   total: number;
   createdAt: string;
 }
@@ -52,11 +52,11 @@ export function SalesPanel({
   onPay,
 }: {
   products: SalesPanelProduct[];
-  customers: Array<{ id: number; jina: string }>;
+  customers: Array<{ id: number; jina: string; simu: string | null }>;
   sales: SalesPanelSale[];
   /** Subscription lapsed: the till is visible but nothing can be sold. */
   locked: boolean;
-  /** Present for the owner only: jumps to the Subscription tab. */
+  /** Jumps to the Subscription tab; absent for accounts that never pay. */
   onPay?: () => void;
 }) {
   const router = useRouter();
@@ -65,6 +65,11 @@ export function SalesPanel({
   const [cart, setCart] = useState<Array<{ productId: number; quantity: number }>>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [customerId, setCustomerId] = useState(0);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [registerCustomer, setRegisterCustomer] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [reference, setReference] = useState("");
   const [paidAmount, setPaidAmount] = useState(0);
   const [busy, setBusy] = useState(false);
 
@@ -82,9 +87,26 @@ export function SalesPanel({
   const cartTotal = cartRows.reduce((sum, item) => sum + item.product.sellingPrice * item.quantity, 0);
   const cartUnits = cartRows.reduce((sum, item) => sum + item.quantity, 0);
   const inCart = (productId: number) => cart.find((item) => item.productId === productId)?.quantity ?? 0;
+  const customerMatches = useMemo(() => {
+    const needle = customerName.trim().toLowerCase();
+    if (!needle || customerId) return [];
+    return customers.filter((customer) => customer.jina.toLowerCase().includes(needle) || customer.simu?.includes(needle)).slice(0, 6);
+  }, [customers, customerName, customerId]);
+  const needsReference = paymentMethod === "MOBILE_MONEY";
+  const missing = !customerName.trim()
+    ? "Andika jina la mteja"
+    : needsReference && reference.length < 4
+      ? "Weka namba ya muamala"
+      : paymentMethod === "CREDIT" && !customerId && !registerCustomer
+        ? "Mkopo unahitaji mteja aliyesajiliwa"
+        : null;
 
   function changeQuantity(product: SalesPanelProduct, delta: number) {
-    const next = inCart(product.id) + delta;
+    setQuantity(product, inCart(product.id) + delta);
+  }
+
+  function setQuantity(product: SalesPanelProduct, requested: number) {
+    const next = Number.isFinite(requested) ? Math.floor(requested) : 0;
     if (next > product.stock) {
       toast(`Stock ya ${product.name} haitoshi (zimebaki ${product.stock}).`, "error");
       return;
@@ -99,12 +121,26 @@ export function SalesPanel({
 
   async function saveSale() {
     setBusy(true);
-    const result = await createSaleAction({ customerId: customerId || null, paymentMethod, paidAmount, items: cart });
+    const result = await createSaleAction({
+      customerId: customerId || null,
+      customerName,
+      registerCustomer: !customerId && registerCustomer,
+      customerPhone,
+      paymentReference: needsReference ? reference : undefined,
+      paymentMethod,
+      paidAmount,
+      items: cart,
+    });
     setBusy(false);
     toast(result.message, result.success ? "success" : "error");
     if (!result.success) return;
     setCart([]);
     setPaidAmount(0);
+    setCustomerId(0);
+    setCustomerName("");
+    setCustomerPhone("");
+    setRegisterCustomer(false);
+    setReference("");
     router.refresh();
     if (result.id) window.open(`/api/sales/${result.id}/receipt`, "_blank", "noopener,noreferrer");
   }
@@ -114,7 +150,7 @@ export function SalesPanel({
       {locked && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/25 bg-danger/5 px-4 py-3">
           <p className="flex items-center gap-2 text-sm text-ink-2"><Lock className="size-4 shrink-0 text-danger" /> Subscription imeisha. Mauzo mapya yamefungwa; historia bado inaonekana.</p>
-          {onPay ? <Button size="sm" onClick={onPay}>Lipia sasa</Button> : <span className="text-xs text-ink-3">Mwambie mmiliki alipie.</span>}
+          {onPay && <Button size="sm" onClick={onPay}>Lipia sasa</Button>}
         </div>
       )}
 
@@ -166,7 +202,7 @@ export function SalesPanel({
         </Card>
 
         <Card className="self-start">
-          <CardHeader title={<span className="flex items-center gap-2"><ShoppingCart className="size-4 text-primary" /> Kikapu</span>} action={<span className="badge badge-info">{cartUnits} vipande</span>} />
+          <CardHeader title={<span className="flex items-center gap-2"><ShoppingCart className="size-4 text-primary" /> Kikapu</span>} action={<span className="badge badge-info">{cartUnits} pc</span>} />
           <CardBody className="space-y-4">
             {cartRows.length === 0 ? (
               <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-sm text-ink-3">Bonyeza bidhaa ili kuiongeza kwenye kikapu.</p>
@@ -180,7 +216,16 @@ export function SalesPanel({
                     </div>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => changeQuantity(item.product, -1)} aria-label={`Punguza ${item.product.name}`} className="grid size-7 place-items-center rounded-md border border-line text-ink-2 hover:border-primary/40 hover:text-primary"><Minus className="size-3.5" /></button>
-                      <span className="w-7 text-center text-sm font-semibold text-ink">{item.quantity}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max={item.product.stock}
+                        value={item.quantity}
+                        onChange={(event) => { if (event.target.value !== "") setQuantity(item.product, Math.max(1, Number(event.target.value))); }}
+                        onFocus={(event) => event.currentTarget.select()}
+                        aria-label={`Idadi ya ${item.product.name} (${item.product.unit})`}
+                        className="h-7 w-14 rounded-md border border-line bg-surface text-center text-sm font-semibold text-ink outline-none focus:border-primary"
+                      />
                       <button type="button" onClick={() => changeQuantity(item.product, 1)} aria-label={`Ongeza ${item.product.name}`} className="grid size-7 place-items-center rounded-md border border-line text-ink-2 hover:border-primary/40 hover:text-primary"><Plus className="size-3.5" /></button>
                       <button type="button" onClick={() => changeQuantity(item.product, -item.quantity)} aria-label={`Ondoa ${item.product.name}`} className="ml-1 grid size-7 place-items-center rounded-md text-ink-3 hover:bg-danger/10 hover:text-danger"><Trash2 className="size-3.5" /></button>
                     </div>
@@ -208,10 +253,64 @@ export function SalesPanel({
               </div>
             </div>
 
-            <Select label={paymentMethod === "CREDIT" ? "Mteja wa mkopo" : "Mteja (hiari)"} value={customerId} onChange={(event) => setCustomerId(Number(event.target.value))}>
-              <option value={0}>Mteja wa kawaida</option>
-              {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.jina}</option>)}
-            </Select>
+            {needsReference && (
+              <Input
+                label="Namba ya muamala (ID ya SMS ya malipo)"
+                value={reference}
+                onChange={(event) => setReference(event.target.value.replace(/\s+/g, "").toUpperCase())}
+                placeholder="mf. DJ45K8L2QX"
+                maxLength={120}
+                autoCapitalize="characters"
+                autoComplete="off"
+                className="uppercase tracking-wider"
+                required
+              />
+            )}
+
+            <div>
+              <div className="relative">
+              <Input
+                label="Jina la mteja"
+                value={customerName}
+                onChange={(event) => { setCustomerName(event.target.value); setCustomerId(0); setSuggesting(true); }}
+                onFocus={() => setSuggesting(true)}
+                onBlur={() => setSuggesting(false)}
+                placeholder="Andika jina au tafuta aliyesajiliwa"
+                maxLength={100}
+                autoComplete="off"
+                required
+              />
+              {suggesting && customerMatches.length > 0 && (
+                <ul className="absolute inset-x-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-line bg-surface py-1 shadow-card">
+                  {customerMatches.map((customer) => (
+                    <li key={customer.id}>
+                      <button
+                        type="button"
+                        // mousedown fires before the input's blur closes the list
+                        onMouseDown={(event) => { event.preventDefault(); setCustomerId(customer.id); setCustomerName(customer.jina); setRegisterCustomer(false); setSuggesting(false); }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
+                      >
+                        <UserRound className="size-4 shrink-0 text-primary" />
+                        <span className="min-w-0 flex-1 truncate font-medium text-ink">{customer.jina}</span>
+                        <span className="shrink-0 text-xs text-ink-3">{customer.simu || "Amesajiliwa"}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              </div>
+              {customerId > 0 ? (
+                <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-success"><BadgeCheck className="size-3.5" /> Mteja aliyesajiliwa</p>
+              ) : customerName.trim() ? (
+                <div className="mt-2 space-y-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-ink-2">
+                    <input type="checkbox" className="size-4 cursor-pointer rounded accent-primary" checked={registerCustomer} onChange={(event) => setRegisterCustomer(event.target.checked)} />
+                    Msajili kama mteja mpya kwenye mfumo
+                  </label>
+                  {registerCustomer && <Input label="Simu ya mteja (hiari)" type="tel" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="0712345678" maxLength={20} />}
+                </div>
+              ) : null}
+            </div>
             {paymentMethod === "CREDIT" && (
               <Input label="Kiasi kilicholipwa sasa" type="number" min="0" max={cartTotal} value={paidAmount} onChange={(event) => setPaidAmount(Number(event.target.value))} />
             )}
@@ -222,9 +321,10 @@ export function SalesPanel({
               {paymentMethod === "CREDIT" && cartTotal > 0 && <p className="mt-1 text-xs text-white/85">Deni litakalobaki: {money(Math.max(0, cartTotal - paidAmount))}</p>}
             </div>
 
-            <Button onClick={() => void saveSale()} loading={busy} disabled={locked || cart.length === 0} size="lg" icon={locked ? <Lock /> : <ReceiptText />} className="w-full">
+            <Button onClick={() => void saveSale()} loading={busy} disabled={locked || cart.length === 0 || missing !== null} size="lg" icon={locked ? <Lock /> : <ReceiptText />} className="w-full">
               {locked ? "Mauzo yamefungwa" : "Kamilisha na Toa Risiti"}
             </Button>
+            {!locked && cart.length > 0 && missing && <p className="text-center text-xs text-ink-3">{missing} ili kukamilisha.</p>}
           </CardBody>
         </Card>
       </div>
@@ -247,8 +347,8 @@ export function SalesPanel({
                     return (
                       <tr key={sale.id} className="transition hover:bg-surface-2">
                         <td className="px-5 py-3"><p className="font-semibold text-ink">{sale.receiptNumber}</p><p className="text-xs text-ink-3">{date(sale.createdAt)} · {sale.servedBy || "Mfumo"}</p></td>
-                        <td className="px-4 py-3 text-ink-2">{sale.customerName || "Kawaida"}</td>
-                        <td className="px-4 py-3"><span className="badge badge-info">{PAYMENT_LABEL[sale.paymentMethod] ?? sale.paymentMethod}</span></td>
+                        <td className="px-4 py-3 text-ink-2">{sale.customerName || "Mteja wa kawaida"}</td>
+                        <td className="px-4 py-3"><span className="badge badge-info">{PAYMENT_LABEL[sale.paymentMethod] ?? sale.paymentMethod}</span>{sale.paymentReference ? <p className="mt-1 text-xs tracking-wider text-ink-3">{sale.paymentReference}</p> : null}</td>
                         <td className="px-4 py-3 text-right font-semibold text-ink">{money(sale.total)}</td>
                         <td className="px-5 py-3">
                           <div className="flex justify-end gap-2">

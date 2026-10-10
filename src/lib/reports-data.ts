@@ -314,7 +314,7 @@ export async function getReportData(businessId: number, period: ReportPeriod, in
       trend: businessTrend,
       paymentMethods: topValues(methodTotals, 4),
       topProducts: [...productTotals.entries()]
-        .map(([label, entry]) => ({ label, value: entry.value, note: `Vipande ${entry.quantity.toLocaleString("en-TZ")}` }))
+        .map(([label, entry]) => ({ label, value: entry.value, note: `${entry.quantity.toLocaleString("en-TZ")} pc` }))
         .sort((a, b) => b.value - a.value)
         .slice(0, 6),
       expenseCategories: topValues(categoryTotals, 6),

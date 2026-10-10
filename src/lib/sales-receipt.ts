@@ -6,6 +6,7 @@ export interface SaleReceiptData {
   receiptNumber: string;
   customerName?: string | null;
   customerPhone?: string | null;
+  paymentReference?: string | null;
   date: Date;
   servedBy?: string | null;
   paymentMethod: string;
@@ -69,6 +70,7 @@ export async function generateSaleReceipt(data: SaleReceiptData) {
     ["Tarehe", data.date.toLocaleString("sw-TZ")],
     ["Huduma", data.servedBy || "Mfumo"],
     ["Njia ya malipo", data.paymentMethod.replaceAll("_", " ")],
+    ["Namba ya muamala", data.paymentReference || "-"],
   ];
   info.forEach(([label, value], index) => {
     const column = index % 2;

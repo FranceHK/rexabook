@@ -13,7 +13,7 @@ const MIN_SNIPPE_SMS = 25;
 
 function refreshSmsPages() {
   revalidatePath("/settings");
-  revalidatePath("/admin/sms");
+  revalidatePath("/admin");
 }
 
 export async function updateSmsPreferenceAction(enabled: boolean): Promise<ActionResult> {

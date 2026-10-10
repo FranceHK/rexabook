@@ -108,7 +108,7 @@ export default async function CustomerDetailPage({
 
   return (
     <AppShell user={{ jina: user.jina, jinaDuka: owner?.jina_duka ?? user.jina_duka, isAdmin: user.role === "ADMIN", businessRole: user.businessRole }}>
-      <CustomerDetailView data={data} />
+      <CustomerDetailView data={data} canDelete={user.businessRole === "OWNER"} />
     </AppShell>
   );
 }

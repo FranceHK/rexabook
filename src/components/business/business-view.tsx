@@ -43,7 +43,7 @@ export interface BusinessViewData {
   upgradeNotice: boolean;
   stats: { revenue: number; grossProfit: number; expenses: number; netProfit: number; stockValue: number; lowStock: number };
   products: Array<{ id: number; name: string; sku: string; unit: string; buyingPrice: number; sellingPrice: number; stock: number; lowStockAt: number }>;
-  sales: Array<{ id: number; receiptNumber: string; customerName: string | null; customerPhone: string | null; servedBy: string | null; paymentMethod: string; total: number; paidAmount: number; profit: number; createdAt: string; items: Array<{ name: string; quantity: number; unitPrice: number; total: number }> }>;
+  sales: Array<{ id: number; receiptNumber: string; customerName: string | null; customerPhone: string | null; servedBy: string | null; paymentMethod: string; paymentReference: string | null; total: number; paidAmount: number; profit: number; createdAt: string; items: Array<{ name: string; quantity: number; unitPrice: number; total: number }> }>;
   expenses: Array<{ id: number; category: string; amount: number; note: string | null; createdAt: string }>;
   customers: Array<{ id: number; jina: string; simu: string | null }>;
   staff: Array<{ id: number; name: string; role: BusinessRole; active: boolean; createdAt: string }>;
@@ -60,7 +60,7 @@ const tabOptions: Array<{ id: TabId; label: string; icon: typeof Activity; roles
   { id: "products", label: "Bidhaa", icon: Boxes, roles: ["OWNER", "MANAGER"] },
   { id: "expenses", label: "Matumizi", icon: WalletCards, roles: ["OWNER", "MANAGER"] },
   { id: "team", label: "Wafanyakazi", icon: UserRoundCog, roles: ["OWNER"] },
-  { id: "subscription", label: "Subscription", icon: Smartphone, roles: ["OWNER"] },
+  { id: "subscription", label: "Subscription", icon: Smartphone, roles: ["OWNER", "MANAGER", "CASHIER"] },
   { id: "audit", label: "Audit", icon: ClipboardList, roles: ["OWNER", "MANAGER"] },
 ];
 
@@ -71,8 +71,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 export function BusinessView({ data }: { data: BusinessViewData }) {
   const router = useRouter();
   const { toast } = useToast();
-  // An owner whose subscription lapsed lands straight on the place to fix it.
-  const [tab, setTab] = useState<TabId>(!data.subscription.active && data.role === "OWNER" ? "subscription" : "overview");
+  // Anyone in the shop may pay, so a lapsed subscription opens straight on the place to fix it.
+  const [tab, setTab] = useState<TabId>(!data.subscription.active ? "subscription" : "overview");
   const [busy, setBusy] = useState<string | null>(null);
 
   const lockedTabs: Partial<Record<TabId, boolean>> = {
@@ -107,7 +107,7 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
           {data.role === "OWNER" && data.features.backup && data.subscription.active && <a href="/api/backup" className="btn btn-outline btn-sm"><Download className="size-4" /> Backup</a>}
         </div>
       </header>
-      {data.upgradeNotice && !data.features.cargo && <p className="mb-5 rounded-lg bg-warning/10 px-4 py-3 text-sm text-ink-2">Sehemu hiyo inapatikana kwenye kifurushi cha Kamili. {data.role === "OWNER" ? "Pandisha kifurushi kwenye tab ya Subscription." : "Mwambie mmiliki apandishe kifurushi."}</p>}
+      {data.upgradeNotice && !data.features.cargo && <p className="mb-5 rounded-lg bg-warning/10 px-4 py-3 text-sm text-ink-2">Sehemu hiyo inapatikana kwenye kifurushi cha Kamili. Pandisha kifurushi kwenye tab ya Subscription.</p>}
 
       <div className="mb-5 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Sehemu za biashara">
         {availableTabs.map(({ id, label, icon: Icon }) => (
@@ -149,7 +149,7 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
           customers={data.customers}
           sales={data.sales}
           locked={!data.subscription.active}
-          onPay={data.role === "OWNER" && !data.subscription.exempt ? () => setTab("subscription") : undefined}
+          onPay={data.subscription.exempt ? undefined : () => setTab("subscription")}
         />
       )}
 
