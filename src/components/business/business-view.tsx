@@ -18,7 +18,6 @@ import {
   WalletCards,
 } from "lucide-react";
 import {
-  createExpenseAction,
   createStaffAction,
   toggleStaffAction,
 } from "@/actions/business";
@@ -27,6 +26,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/theme/toast-provider";
+import { ExpensesPanel } from "@/components/business/expenses-panel";
 import { ProductsPanel } from "@/components/business/products-panel";
 import { SalesPanel } from "@/components/business/sales-panel";
 import { SubscriptionPanel } from "@/components/business/subscription-panel";
@@ -153,13 +153,7 @@ export function BusinessView({ data }: { data: BusinessViewData }) {
         />
       )}
 
-      {tab === "expenses" && (
-        <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
-          <Card><CardHeader title="Rekodi Matumizi" /><CardBody><form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void submitForm("expense", event.currentTarget, createExpenseAction); }}><Select label="Aina" name="aina" required><option value="">Chagua</option><option>Usafiri</option><option>Kodi</option><option>Mishahara</option><option>Umeme/Maji</option><option>Masoko</option><option>Stock</option><option>Mengine</option></Select><Input label="Kiasi" name="kiasi" type="number" min="1" required /><Input label="Maelezo" name="maelezo" /><Button type="submit" loading={busy === "expense"} icon={<Plus />} className="w-full">Hifadhi Matumizi</Button></form></CardBody></Card>
-          <Card><CardHeader title="Matumizi ya Karibuni" action={<span className="badge badge-wait">{money(data.stats.expenses)}</span>} /><CardBody className="!p-0">{data.expenses.length === 0 ? <Empty>Hakuna matumizi bado.</Empty> : <div className="divide-y divide-line">{data.expenses.map((expense) => <div key={expense.id} className="flex items-center justify-between gap-3 px-5 py-3"><div><p className="font-semibold text-ink">{expense.category}</p><p className="text-xs text-ink-3">{expense.note || "Bila maelezo"} · {date(expense.createdAt)}</p></div><p className="font-semibold text-danger">{money(expense.amount)}</p></div>)}</div>}</CardBody></Card>
-        </div>
-      )}
-
+      {tab === "expenses" && <ExpensesPanel expenses={data.expenses} monthTotal={data.stats.expenses} locked={!data.subscription.active} />}
 
       {tab === "team" && (
         <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
